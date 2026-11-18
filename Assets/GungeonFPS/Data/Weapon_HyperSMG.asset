@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e11f4de602ed114785c07d04259cd6c, type: 3}
+  m_Name: Weapon_HyperSMG
+  m_EditorClassIdentifier: Assembly-CSharp::GungeonFPS.Weapons.WeaponData
+  weaponName: HYPER PULSE SMG
+  hudSprite: {fileID: 21300000, guid: 6161acf81542d7940a4642df0ac1e44a, type: 3}
+  projectileColor: {r: 1, g: 0.3, b: 0.75, a: 1}
+  fireRate: 11.5
+  pelletsPerShot: 1
+  spreadAngle: 3.2
+  damage: 10
+  projectileSpeed: 46
+  projectileScale: 0.26
+  knockbackForce: 2.5
+  maxBounces: 0
+  magazineSize: 36
+  maxTotalAmmo: -1
+  reloadTime: 0.9
+  automatic: 1
+  recoilKickPixels: 16
+  screenShake: 0.025

@@ -116,7 +116,10 @@ namespace GungeonFPS.Dungeon
 
             if (rewardPickupPrefab != null)
             {
-                Vector3 pos = rewardSpawnPoint != null ? rewardSpawnPoint.position : transform.position + Vector3.up * 0.9f;
+                bool isChest = rewardPickupPrefab.GetComponent<ChestController>() != null;
+                Vector3 pos = rewardSpawnPoint != null
+                    ? rewardSpawnPoint.position
+                    : transform.position + (isChest ? Vector3.zero : Vector3.up * 0.9f);
                 Instantiate(rewardPickupPrefab, pos, Quaternion.identity);
             }
         }

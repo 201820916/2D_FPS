@@ -96,8 +96,7 @@ namespace GungeonFPS.Player
             if (_dashTimer > 0f)
                 _dashTimer -= Time.deltaTime;
 
-            bool dashPressed = Keyboard.current.leftShiftKey.wasPressedThisFrame ||
-                               Mouse.current.rightButton.wasPressedThisFrame;
+            bool dashPressed = Keyboard.current.leftShiftKey.wasPressedThisFrame;
 
             if (dashPressed && _dashCooldownTimer <= 0f && _dashTimer <= 0f)
             {
@@ -116,8 +115,7 @@ namespace GungeonFPS.Player
                 RetroAudio.Instance?.Play(SfxType.Dash);
             }
 
-            bool blankPressed = Keyboard.current.qKey.wasPressedThisFrame ||
-                                Keyboard.current.eKey.wasPressedThisFrame;
+            bool blankPressed = Keyboard.current.qKey.wasPressedThisFrame;
             if (blankPressed && BlanksCount > 0)
             {
                 TriggerBlank();

@@ -13,12 +13,15 @@ namespace GungeonFPS.UI
         [SerializeField] private PlayerHealth playerHealth;
         [SerializeField] private PlayerController playerController;
         [SerializeField] private WeaponController weaponController;
+        [SerializeField] private SecondaryWeaponController secondaryController;
 
         [SerializeField] private Text statusText;
+        [SerializeField] private Text interactPromptText;
         [SerializeField] private Image dashFillBar;
         [SerializeField] private Image hitmarkerImage;
 
         private float _hitmarkerTimer;
+        private string _pendingPrompt;
 
         private void Awake()
         {
@@ -31,6 +34,8 @@ namespace GungeonFPS.UI
 
             if (hitmarkerImage != null)
                 hitmarkerImage.enabled = false;
+            if (interactPromptText != null)
+                interactPromptText.text = "";
         }
 
         public void TriggerHitmarker()
@@ -38,6 +43,20 @@ namespace GungeonFPS.UI
             if (hitmarkerImage == null) return;
             hitmarkerImage.enabled = true;
             _hitmarkerTimer = 0.1f;
+        }
+
+        public void RequestInteractPrompt(string prompt)
+        {
+            _pendingPrompt = prompt;
+        }
+
+        private void LateUpdate()
+        {
+            if (interactPromptText != null)
+            {
+                interactPromptText.text = _pendingPrompt ?? "";
+            }
+            _pendingPrompt = null;
         }
 
         private void Update()
@@ -64,7 +83,7 @@ namespace GungeonFPS.UI
                     roomStr = $"  |  [{r.RoomName}] ENEMIES: {r.RemainingEnemies}";
                 }
 
-                string weaponStr = "";
+                string mainStr = "";
                 if (weaponController != null && weaponController.CurrentWeapon != null)
                 {
                     var w = weaponController.CurrentWeapon;
@@ -72,10 +91,18 @@ namespace GungeonFPS.UI
                         ? $"{weaponController.CurrentMagAmmo}/{w.magazineSize} (INF)"
                         : $"{weaponController.CurrentMagAmmo}/{weaponController.CurrentReserveAmmo}";
                     string reload = weaponController.IsReloading ? " [RELOADING]" : "";
-                    weaponStr = $"\n[{w.weaponName}]  {ammo}{reload}   (1/2/3 Swap | Shift/RMB Dash | R Reload)";
+                    mainStr = $"\n[MAIN / LMB] {w.weaponName}  {ammo}{reload}";
                 }
 
-                statusText.text = hpStr + blankStr + roomStr + weaponStr;
+                string secStr = "";
+                if (secondaryController != null && secondaryController.CurrentSecondary != null)
+                {
+                    var s = secondaryController.CurrentSecondary;
+                    int pct = Mathf.RoundToInt(secondaryController.CooldownOrEnergyNormalized * 100f);
+                    secStr = $"   |   [SEC / RMB] {s.weaponName} ({pct}%)   |   [SHIFT] DASH";
+                }
+
+                statusText.text = hpStr + blankStr + roomStr + mainStr + secStr;
             }
         }
     }

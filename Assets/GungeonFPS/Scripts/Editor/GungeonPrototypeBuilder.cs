@@ -3,6 +3,8 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using GungeonFPS.Core;
@@ -21,118 +23,151 @@ namespace GungeonFPS.Editor
         private const string DataPath = RootPath + "/Data";
         private const string PrefabPath = RootPath + "/Prefabs";
         private const string ScenePath = RootPath + "/Scenes/GungeonPrototype.unity";
+        private const string ExternalPath = "Assets/ExternalAssets";
 
         [MenuItem("Tools/GungeonFPS/Build Prototype Scene")]
         public static void BuildPrototype()
         {
             EnsureFolders();
+            EnsureExternalAssetsFolder();
             EnsureTagExists("Enemy");
+            CleanupOldWeapons();
 
-            // 1. Generate pixel art textures & sprites
-            Texture2D floorTex = SaveTexture("floor_tile.png", CreateFloorTexture(), false);
-            Texture2D wallTex = SaveTexture("wall_tile.png", CreateWallTexture(), false);
+            // 1. Load external Font & Crosshair
+            Font hudFont = LoadExternalFont();
+            Sprite crosshairSp = LoadExternalCrosshair();
 
-            Sprite playerBulletSp = SaveSprite("bullet_player.png", CreateCircleTexture(16, new Color(1f, 0.95f, 0.4f), Color.white), 16);
-            Sprite enemyBulletSp = SaveSprite("bullet_enemy.png", CreateCircleTexture(16, new Color(1f, 0.25f, 0.15f), new Color(1f, 0.9f, 0.6f)), 16);
-            Sprite chaserSp = SaveSprite("enemy_bulletkin.png", CreateBulletKinTexture(new Color(0.85f, 0.65f, 0.2f), new Color(0.9f, 0.2f, 0.2f)), 16);
-            Sprite spreadSp = SaveSprite("enemy_shotgunkin.png", CreateBulletKinTexture(new Color(0.85f, 0.22f, 0.22f), new Color(0.2f, 0.2f, 0.25f)), 16);
+            // 2. Generate clean, eye-friendly dark slate grid textures & neon sprites
+            Texture2D floorTex = SaveTexture("neon_floor_grid.png", CreateNeonGridTexture(new Color(0.11f, 0.12f, 0.15f), new Color(0.20f, 0.23f, 0.29f)), false);
+            Texture2D wallTex = SaveTexture("neon_wall_grid.png", CreateNeonGridTexture(new Color(0.15f, 0.16f, 0.20f), new Color(0.26f, 0.29f, 0.36f)), false);
 
-            Sprite pistolSp = SaveSprite("gun_pistol.png", CreateGunTexture(new Color(0.55f, 0.6f, 0.68f), new Color(0.35f, 0.22f, 0.15f)), 16);
-            Sprite shotgunSp = SaveSprite("gun_shotgun.png", CreateShotgunTexture(), 16);
-            Sprite bounceSp = SaveSprite("gun_bounce.png", CreateGunTexture(new Color(0.15f, 0.85f, 0.95f), new Color(0.1f, 0.25f, 0.45f)), 16);
+            Sprite playerBulletSp = SaveSprite("bullet_player.png", CreateCircleTexture(16, new Color(0.15f, 0.9f, 1f), Color.white), 16);
+            Sprite enemyBulletSp = SaveSprite("bullet_enemy.png", CreateCircleTexture(16, new Color(1f, 0.15f, 0.35f), new Color(1f, 0.85f, 0.85f)), 16);
+            Sprite chaserSp = SaveSprite("enemy_drone.png", CreateNeonDroneTexture(new Color(0.14f, 0.16f, 0.22f), new Color(1f, 0.25f, 0.2f)), 16);
+            Sprite spreadSp = SaveSprite("enemy_turret.png", CreateNeonTurretTexture(new Color(0.16f, 0.12f, 0.24f), new Color(1f, 0.15f, 0.65f)), 16);
 
-            Sprite muzzleSp = SaveSprite("muzzle_flash.png", CreateMuzzleFlashTexture(), 16);
+            Sprite neonShotgunSp = SaveSprite("gun_neon_shotgun.png", CreateNeonShotgunTexture(), 32);
+            Sprite muzzleSp = SaveSprite("muzzle_flash.png", CreateMuzzleFlashTexture(new Color(0.2f, 0.95f, 1f)), 16);
             Sprite hitmarkerSp = SaveSprite("hitmarker.png", CreateHitmarkerTexture(), 16);
-            Sprite heartSp = SaveSprite("pickup_heart.png", CreateCircleTexture(16, new Color(0.95f, 0.2f, 0.35f), new Color(1f, 0.7f, 0.75f)), 16);
-            Sprite blankSp = SaveSprite("pickup_blank.png", CreateCircleTexture(16, new Color(0.25f, 0.8f, 1f), Color.white), 16);
+            Sprite heartSp = SaveSprite("pickup_heart.png", CreateCircleTexture(16, new Color(0.95f, 0.2f, 0.45f), new Color(1f, 0.8f, 0.85f)), 16);
+            Sprite blankSp = SaveSprite("pickup_blank.png", CreateCircleTexture(16, new Color(0.2f, 0.9f, 1f), Color.white), 16);
 
-            // 2. Create WeaponData ScriptableObjects
-            WeaponData pistol = CreateOrUpdateWeapon("Weapon_Pistol", w =>
+            // 3. Main Weapons (1 equipped by default + 2 chest loot weapons)
+            WeaponData neonShotgun = CreateOrUpdateWeapon("Weapon_NeonShotgun", w =>
             {
-                w.weaponName = "Rusty Sidearm";
-                w.hudSprite = pistolSp;
-                w.projectileColor = new Color(1f, 0.95f, 0.35f);
-                w.fireRate = 5.5f;
-                w.pelletsPerShot = 1;
-                w.spreadAngle = 1.2f;
-                w.damage = 18f;
-                w.projectileSpeed = 40f;
-                w.projectileScale = 0.35f;
-                w.knockbackForce = 4f;
-                w.maxBounces = 0;
-                w.magazineSize = 12;
-                w.maxTotalAmmo = -1;
-                w.reloadTime = 0.7f;
-                w.automatic = true;
-                w.recoilKickPixels = 26f;
-                w.screenShake = 0.035f;
-            });
-
-            WeaponData shotgun = CreateOrUpdateWeapon("Weapon_Shotgun", w =>
-            {
-                w.weaponName = "Room Sweeper";
-                w.hudSprite = shotgunSp;
-                w.projectileColor = new Color(1f, 0.55f, 0.2f);
-                w.fireRate = 1.6f;
+                w.weaponName = "PULSAR-8 SHOTGUN";
+                w.hudSprite = neonShotgunSp;
+                w.projectileColor = new Color(0.25f, 0.95f, 1f);
+                w.fireRate = 2.1f;
                 w.pelletsPerShot = 8;
-                w.spreadAngle = 7.5f;
-                w.damage = 14f;
-                w.projectileSpeed = 36f;
-                w.projectileScale = 0.32f;
-                w.knockbackForce = 9f;
+                w.spreadAngle = 6.5f;
+                w.damage = 15f;
+                w.projectileSpeed = 42f;
+                w.projectileScale = 0.34f;
+                w.knockbackForce = 10f;
                 w.maxBounces = 0;
                 w.magazineSize = 6;
-                w.maxTotalAmmo = 60;
-                w.reloadTime = 1.0f;
+                w.maxTotalAmmo = -1;
+                w.reloadTime = 0.75f;
                 w.automatic = false;
-                w.recoilKickPixels = 52f;
-                w.screenShake = 0.11f;
+                w.recoilKickPixels = 48f;
+                w.screenShake = 0.10f;
             });
 
-            WeaponData bounceGun = CreateOrUpdateWeapon("Weapon_BounceGun", w =>
+            WeaponData ricochetRifle = CreateOrUpdateWeapon("Weapon_RicochetRifle", w =>
             {
-                w.weaponName = "Ricochet Blaster";
-                w.hudSprite = bounceSp;
-                w.projectileColor = new Color(0.2f, 0.95f, 1f);
-                w.fireRate = 4.0f;
+                w.weaponName = "RICOCHET RIFLE";
+                w.hudSprite = neonShotgunSp;
+                w.projectileColor = new Color(0.2f, 1f, 0.55f);
+                w.fireRate = 4.5f;
                 w.pelletsPerShot = 1;
                 w.spreadAngle = 0.8f;
                 w.damage = 24f;
-                w.projectileSpeed = 32f;
-                w.projectileScale = 0.45f;
+                w.projectileSpeed = 36f;
+                w.projectileScale = 0.42f;
                 w.knockbackForce = 5f;
                 w.maxBounces = 3;
-                w.magazineSize = 15;
-                w.maxTotalAmmo = 120;
-                w.reloadTime = 0.85f;
+                w.magazineSize = 16;
+                w.maxTotalAmmo = -1;
+                w.reloadTime = 0.8f;
                 w.automatic = true;
-                w.recoilKickPixels = 32f;
-                w.screenShake = 0.05f;
+                w.recoilKickPixels = 28f;
+                w.screenShake = 0.045f;
             });
 
-            // 3. Create Prefabs
+            WeaponData hyperSmg = CreateOrUpdateWeapon("Weapon_HyperSMG", w =>
+            {
+                w.weaponName = "HYPER PULSE SMG";
+                w.hudSprite = neonShotgunSp;
+                w.projectileColor = new Color(1f, 0.3f, 0.75f);
+                w.fireRate = 11.5f;
+                w.pelletsPerShot = 1;
+                w.spreadAngle = 3.2f;
+                w.damage = 10f;
+                w.projectileSpeed = 46f;
+                w.projectileScale = 0.26f;
+                w.knockbackForce = 2.5f;
+                w.maxBounces = 0;
+                w.magazineSize = 36;
+                w.maxTotalAmmo = -1;
+                w.reloadTime = 0.9f;
+                w.automatic = true;
+                w.recoilKickPixels = 16f;
+                w.screenShake = 0.025f;
+            });
+
+            // 3b. Secondary Weapons (1 equipped by default + 1 chest loot)
+            SecondaryWeaponData neonBlade = CreateOrUpdateSecondary("Secondary_NeonBlade", s =>
+            {
+                s.weaponName = "NEON BLADE";
+                s.secondaryType = SecondaryWeaponType.EnergyBlade;
+                s.accentColor = new Color(0.25f, 0.95f, 1f);
+                s.cooldown = 0.55f;
+                s.damage = 34f;
+                s.range = 3.4f;
+                s.knockback = 14f;
+                s.bulletClearRadius = 2.8f;
+            });
+
+            SecondaryWeaponData aegisShield = CreateOrUpdateSecondary("Secondary_AegisShield", s =>
+            {
+                s.weaponName = "AEGIS SHIELD";
+                s.secondaryType = SecondaryWeaponType.AegisShield;
+                s.accentColor = new Color(0.3f, 0.8f, 1f);
+                s.maxEnergy = 100f;
+                s.drainPerSecond = 30f;
+                s.regenPerSecond = 24f;
+            });
+
+            // 4. Create Prefabs
             GameObject playerBulletPrefab = CreateBulletPrefab("PlayerBullet", playerBulletSp, typeof(PlayerProjectile));
             GameObject enemyBulletPrefab = CreateBulletPrefab("EnemyBullet", enemyBulletSp, typeof(EnemyBullet));
 
             GameObject chaserPrefab = CreateEnemyPrefab("Enemy_Chaser", chaserSp, EnemyPattern.SingleChaser, enemyBulletPrefab, 60f, 1.5f, 8.5f, 1);
             GameObject spreadPrefab = CreateEnemyPrefab("Enemy_Spread", spreadSp, EnemyPattern.SpreadTurret, enemyBulletPrefab, 90f, 2.0f, 7.5f, 5);
 
-            GameObject heartPickup = CreatePickupPrefab("Pickup_Heart", heartSp, PickupType.Health, 2);
-            GameObject blankPickup = CreatePickupPrefab("Pickup_Blank", blankSp, PickupType.Blank, 1);
+            GameObject weaponPickupPrefab = CreateWeaponPickupPrefab();
+            GameObject chestPrefab = CreateChestPrefab(
+                weaponPickupPrefab,
+                new[] { ricochetRifle, hyperSmg, neonShotgun },
+                new[] { aegisShield, neonBlade });
 
-            // 4. Build Scene
+            // 5. Build Scene
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            // Lighting
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.55f, 0.55f, 0.62f);
+            // Clean neutral lighting & subtle Bloom (no eye-straining blue fog)
+            RenderSettings.ambientMode = AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.45f, 0.46f, 0.50f);
+            RenderSettings.fog = false;
 
             var lightGo = new GameObject("Directional Light");
             var light = lightGo.AddComponent<Light>();
             light.type = LightType.Directional;
-            light.intensity = 1.2f;
-            light.color = new Color(1f, 0.97f, 0.92f);
+            light.intensity = 1.25f;
+            light.color = new Color(1f, 0.98f, 0.95f);
             lightGo.transform.rotation = Quaternion.Euler(50f, -35f, 0f);
+
+            CreateNeonVolume();
 
             // Managers
             var systems = new GameObject("GameSystems");
@@ -141,18 +176,112 @@ namespace GungeonFPS.Editor
             systems.AddComponent<VfxSpawner>();
 
             // Mini-Dungeon (3 Connected Rooms along +Z)
-            BuildMiniDungeon(floorTex, wallTex, chaserPrefab, spreadPrefab, heartPickup, blankPickup);
+            BuildMiniDungeon(floorTex, wallTex, chaserPrefab, spreadPrefab, chestPrefab);
 
-            // HUD & Player
+            // HUD & Player (1 Main + 1 Secondary)
             CreateHUDAndPlayer(
                 playerBulletPrefab,
-                new[] { pistol, shotgun, bounceGun },
+                new[] { neonShotgun },
+                neonBlade,
                 muzzleSp,
-                hitmarkerSp);
+                hitmarkerSp,
+                crosshairSp,
+                hudFont);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.Refresh();
-            Debug.Log("[GungeonPrototypeBuilder] Upgraded 3-room prototype scene built at: " + ScenePath);
+            Debug.Log("[GungeonPrototypeBuilder] Neon-SF Prototype scene built at: " + ScenePath);
+        }
+
+        private static void EnsureExternalAssetsFolder()
+        {
+            if (AssetDatabase.IsValidFolder("Assets/outland") && !AssetDatabase.IsValidFolder(ExternalPath))
+            {
+                string err = AssetDatabase.MoveAsset("Assets/outland", ExternalPath);
+                if (!string.IsNullOrEmpty(err))
+                    Debug.LogWarning("[GungeonPrototypeBuilder] Could not rename Assets/outland: " + err);
+            }
+        }
+
+        private static void CleanupOldWeapons()
+        {
+            string[] legacy = { DataPath + "/Weapon_Pistol.asset", DataPath + "/Weapon_BounceGun.asset", DataPath + "/Weapon_Shotgun.asset" };
+            foreach (string path in legacy)
+            {
+                if (File.Exists(path))
+                    AssetDatabase.DeleteAsset(path);
+            }
+        }
+
+        private static Font LoadExternalFont()
+        {
+            string[] candidates =
+            {
+                ExternalPath + "/Orbitron/static/Orbitron-Bold.ttf",
+                ExternalPath + "/Orbitron/static/Orbitron-Regular.ttf",
+                "Assets/outland/Orbitron/static/Orbitron-Bold.ttf"
+            };
+            foreach (string path in candidates)
+            {
+                Font f = AssetDatabase.LoadAssetAtPath<Font>(path);
+                if (f != null) return f;
+            }
+            return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
+
+        private static Sprite LoadExternalCrosshair()
+        {
+            string[] candidates =
+            {
+                ExternalPath + "/kenney_crosshairPack/PNG/Outline/crosshair061.png",
+                ExternalPath + "/kenney_crosshairPack/PNG/Outline/crosshair008.png",
+                ExternalPath + "/kenney_crosshairPack/PNG/Outline/crosshair001.png",
+                "Assets/outland/kenney_crosshairPack/PNG/Outline/crosshair061.png",
+                "Assets/outland/kenney_crosshairPack/PNG/Outline/crosshair001.png"
+            };
+
+            foreach (string path in candidates)
+            {
+                if (!File.Exists(path)) continue;
+                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer != null && (importer.textureType != TextureImporterType.Sprite || importer.spriteImportMode != SpriteImportMode.Single))
+                {
+                    importer.textureType = TextureImporterType.Sprite;
+                    importer.spriteImportMode = SpriteImportMode.Single;
+                    importer.filterMode = FilterMode.Bilinear;
+                    importer.SaveAndReimport();
+                }
+                Sprite sp = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                if (sp != null) return sp;
+            }
+            return null;
+        }
+
+        private static void CreateNeonVolume()
+        {
+            var volGo = new GameObject("NeonPostProcessVolume");
+            var vol = volGo.AddComponent<Volume>();
+            vol.isGlobal = true;
+
+            string profilePath = ArtPath + "/NeonVolumeProfile.asset";
+            var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(profilePath);
+            if (profile == null)
+            {
+                profile = ScriptableObject.CreateInstance<VolumeProfile>();
+                AssetDatabase.CreateAsset(profile, profilePath);
+            }
+            else
+            {
+                profile.components.Clear();
+            }
+
+            var bloom = profile.Add<Bloom>(true);
+            bloom.threshold.Override(1.05f);
+            bloom.intensity.Override(0.65f);
+            bloom.scatter.Override(0.55f);
+
+            EditorUtility.SetDirty(profile);
+            vol.sharedProfile = profile;
         }
 
         private static void BuildMiniDungeon(
@@ -160,30 +289,33 @@ namespace GungeonFPS.Editor
             Texture2D wallTex,
             GameObject chaserPrefab,
             GameObject spreadPrefab,
-            GameObject heartPickup,
-            GameObject blankPickup)
+            GameObject chestPrefab)
         {
             var dungeon = new GameObject("MiniDungeon");
 
             Shader litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+
             Material floorMat = new Material(litShader) { mainTexture = floorTex };
-            floorMat.mainTextureScale = new Vector2(10f, 10f);
+            floorMat.mainTextureScale = new Vector2(12f, 12f);
             AssetDatabase.CreateAsset(floorMat, ArtPath + "/FloorMat.mat");
 
             Material wallMat = new Material(litShader) { mainTexture = wallTex };
-            wallMat.mainTextureScale = new Vector2(8f, 2f);
+            wallMat.mainTextureScale = new Vector2(10f, 2f);
             AssetDatabase.CreateAsset(wallMat, ArtPath + "/WallMat.mat");
 
-            Material doorMat = new Material(litShader) { color = new Color(0.75f, 0.3f, 0.2f) };
+            Material doorMat = new Material(litShader) { color = new Color(0.18f, 0.06f, 0.12f) };
+            doorMat.EnableKeyword("_EMISSION");
+            doorMat.SetColor("_EmissionColor", new Color(1f, 0.15f, 0.35f) * 1.8f);
             AssetDatabase.CreateAsset(doorMat, ArtPath + "/DoorMat.mat");
 
-            // Room 0: Start Room (16x16 at z=0, North doorway)
-            BuildRoomShell(dungeon.transform, "StartRoom", new Vector3(0f, 0f, 0f), 16f, 16f, false, true, floorMat, wallMat);
+            // Room 0: Start Room (includes 1 starter test chest!)
+            var startRoom = BuildRoomShell(dungeon.transform, "StartRoom", new Vector3(0f, 0f, 0f), 16f, 16f, false, true, floorMat, wallMat);
+            var startChest = (GameObject)PrefabUtility.InstantiatePrefab(chestPrefab, startRoom.transform);
+            startChest.transform.position = new Vector3(4.5f, 0f, 4f);
 
-            // Corridor 0 -> 1 (width 6, z=8..14)
             BuildCorridor(dungeon.transform, "Corridor_0_1", new Vector3(0f, 0f, 11f), 6f, 6f, floorMat, wallMat);
 
-            // Room 1: Combat Room 1 (28x28 at z=28, South & North doorways)
+            // Room 1: Combat Room 1
             var room1Go = BuildRoomShell(dungeon.transform, "CombatRoom_1", new Vector3(0f, 0f, 28f), 28f, 28f, true, true, floorMat, wallMat);
             CreateBox(room1Go.transform, "Pillar_L", new Vector3(-6f, 2f, 28f), new Vector3(2.5f, 4f, 2.5f), wallMat);
             CreateBox(room1Go.transform, "Pillar_R", new Vector3(6f, 2f, 28f), new Vector3(2.5f, 4f, 2.5f), wallMat);
@@ -198,12 +330,11 @@ namespace GungeonFPS.Editor
                 SpawnEnemy(chaserPrefab, new Vector3(-5f, 0f, 24f), room1Go.transform),
                 SpawnEnemy(spreadPrefab, new Vector3(0f, 0f, 37f), room1Go.transform)
             };
-            AttachRoomController(room1Go, "Chamber 1", new Vector3(26f, 4f, 26f), new[] { door1S, door1N }, r1Enemies, heartPickup);
+            AttachRoomController(room1Go, "SECTOR 01", new Vector3(26f, 4f, 26f), new[] { door1S, door1N }, r1Enemies, chestPrefab);
 
-            // Corridor 1 -> 2 (width 6, z=42..48)
             BuildCorridor(dungeon.transform, "Corridor_1_2", new Vector3(0f, 0f, 45f), 6f, 6f, floorMat, wallMat);
 
-            // Room 2: Combat Room 2 (32x32 at z=64, South doorway only)
+            // Room 2: Combat Room 2
             var room2Go = BuildRoomShell(dungeon.transform, "CombatRoom_2", new Vector3(0f, 0f, 64f), 32f, 32f, true, false, floorMat, wallMat);
             CreateBox(room2Go.transform, "Pillar_NW", new Vector3(-7f, 2f, 70f), new Vector3(2.5f, 4f, 2.5f), wallMat);
             CreateBox(room2Go.transform, "Pillar_NE", new Vector3(7f, 2f, 70f), new Vector3(2.5f, 4f, 2.5f), wallMat);
@@ -220,7 +351,7 @@ namespace GungeonFPS.Editor
                 SpawnEnemy(spreadPrefab, new Vector3(-9f, 0f, 75f), room2Go.transform),
                 SpawnEnemy(spreadPrefab, new Vector3(9f, 0f, 75f), room2Go.transform)
             };
-            AttachRoomController(room2Go, "Chamber 2 (Boss)", new Vector3(30f, 4f, 30f), new[] { door2S }, r2Enemies, blankPickup);
+            AttachRoomController(room2Go, "SECTOR 02 (CORE)", new Vector3(30f, 4f, 30f), new[] { door2S }, r2Enemies, chestPrefab);
         }
 
         private static GameObject BuildRoomShell(
@@ -238,13 +369,10 @@ namespace GungeonFPS.Editor
             float halfW = width * 0.5f;
             float halfD = depth * 0.5f;
 
-            // West & East walls
             CreateBox(room.transform, "Wall_West", center + new Vector3(-halfW - 0.5f, wallY, 0f), new Vector3(1f, wallH, depth + 2f), wallMat);
             CreateBox(room.transform, "Wall_East", center + new Vector3(halfW + 0.5f, wallY, 0f), new Vector3(1f, wallH, depth + 2f), wallMat);
 
-            // North wall (with optional 6m doorway)
             BuildWallWithDoorway(room.transform, "North", center + new Vector3(0f, wallY, halfD + 0.5f), width, wallH, northDoorway, wallMat);
-            // South wall (with optional 6m doorway)
             BuildWallWithDoorway(room.transform, "South", center + new Vector3(0f, wallY, -halfD - 0.5f), width, wallH, southDoorway, wallMat);
 
             return room;
@@ -335,7 +463,8 @@ namespace GungeonFPS.Editor
         }
 
         private static void CreateHUDAndPlayer(
-            GameObject playerBulletPrefab, WeaponData[] weapons, Sprite muzzleSp, Sprite hitmarkerSp)
+            GameObject playerBulletPrefab, WeaponData[] weapons, SecondaryWeaponData defaultSecondary,
+            Sprite muzzleSp, Sprite hitmarkerSp, Sprite crosshairSp, Font hudFont)
         {
             var playerGo = new GameObject("Player");
             playerGo.tag = "Player";
@@ -358,13 +487,22 @@ namespace GungeonFPS.Editor
             camGo.transform.SetParent(pivot.transform);
             camGo.transform.localPosition = Vector3.zero;
             var cam = camGo.AddComponent<Camera>();
-            cam.fieldOfView = 80f;
+            cam.fieldOfView = 82f;
             cam.nearClipPlane = 0.05f;
+            cam.backgroundColor = new Color(0.02f, 0.03f, 0.06f);
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            var urpCamData = camGo.AddComponent<UniversalAdditionalCameraData>();
+            urpCamData.renderPostProcessing = true;
             camGo.AddComponent<AudioListener>();
 
             var fireOrigin = new GameObject("FireOrigin");
             fireOrigin.transform.SetParent(camGo.transform);
-            fireOrigin.transform.localPosition = new Vector3(0.25f, -0.15f, 0.55f);
+            fireOrigin.transform.localPosition = new Vector3(0.26f, -0.18f, 0.75f);
+
+            // Build sleek 3D Viewmodels (Main Gun + Secondary Blade & Shield)
+            Transform viewmodelRoot = Build3DNeonShotgun(camGo.transform, out Light muzzleLight, out Material gunCoreMat);
+            Transform bladeViewmodel = Build3DNeonBlade(camGo.transform);
+            Transform shieldViewmodel = Build3DAegisShield(camGo.transform, out ShieldBlocker shieldBlocker);
 
             // Canvas
             var canvasGo = new GameObject("HUDCanvas");
@@ -387,23 +525,26 @@ namespace GungeonFPS.Editor
             flashRect.offsetMin = Vector2.zero;
             flashRect.offsetMax = Vector2.zero;
 
-            // Crosshair + Hitmarker
+            // Crosshair (External Kenney Crosshair)
             var crossGo = new GameObject("Crosshair");
             crossGo.transform.SetParent(canvasGo.transform, false);
             var crossImg = crossGo.AddComponent<Image>();
-            crossImg.color = new Color(1f, 1f, 1f, 0.85f);
+            crossImg.sprite = crosshairSp;
+            crossImg.color = new Color(0.35f, 0.95f, 1f, 0.92f);
             crossImg.raycastTarget = false;
-            crossImg.rectTransform.sizeDelta = new Vector2(8f, 8f);
+            crossImg.preserveAspect = true;
+            crossImg.rectTransform.sizeDelta = crosshairSp != null ? new Vector2(44f, 44f) : new Vector2(8f, 8f);
 
+            // Hitmarker
             var hitGo = new GameObject("Hitmarker");
             hitGo.transform.SetParent(canvasGo.transform, false);
             var hitImg = hitGo.AddComponent<Image>();
             hitImg.sprite = hitmarkerSp;
-            hitImg.color = new Color(1f, 0.25f, 0.25f, 0.95f);
+            hitImg.color = new Color(1f, 0.25f, 0.35f, 0.95f);
             hitImg.raycastTarget = false;
             hitImg.rectTransform.sizeDelta = new Vector2(36f, 36f);
 
-            // 2D HUD Weapon + Muzzle Flash
+            // 2D HUD Weapon (disabled when using 3D Viewmodel) + Muzzle Flash
             var weaponImgGo = new GameObject("HUDWeapon");
             weaponImgGo.transform.SetParent(canvasGo.transform, false);
             var weaponImg = weaponImgGo.AddComponent<Image>();
@@ -412,8 +553,9 @@ namespace GungeonFPS.Editor
             wRect.anchorMin = new Vector2(0.5f, 0f);
             wRect.anchorMax = new Vector2(0.5f, 0f);
             wRect.pivot = new Vector2(0.5f, 0f);
-            wRect.anchoredPosition = new Vector2(220f, -10f);
-            wRect.sizeDelta = new Vector2(420f, 315f);
+            wRect.anchoredPosition = new Vector2(240f, -15f);
+            wRect.sizeDelta = new Vector2(460f, 345f);
+            weaponImgGo.SetActive(false);
 
             var muzzleGo = new GameObject("HUDMuzzleFlash");
             muzzleGo.transform.SetParent(weaponImgGo.transform, false);
@@ -422,40 +564,61 @@ namespace GungeonFPS.Editor
             muzzleImg.raycastTarget = false;
             muzzleImg.enabled = false;
             var mRect = muzzleImg.rectTransform;
-            mRect.anchoredPosition = new Vector2(85f, 75f);
-            mRect.sizeDelta = new Vector2(130f, 130f);
+            mRect.anchoredPosition = new Vector2(95f, 80f);
+            mRect.sizeDelta = new Vector2(140f, 140f);
 
-            // Status Text
+            // Status Text (Orbitron Font)
             var textGo = new GameObject("StatusText");
             textGo.transform.SetParent(canvasGo.transform, false);
             var statusText = textGo.AddComponent<Text>();
-            statusText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            statusText.fontSize = 26;
-            statusText.color = Color.white;
+            statusText.font = hudFont;
+            statusText.fontSize = 24;
+            statusText.color = new Color(0.85f, 0.96f, 1f);
             statusText.raycastTarget = false;
+            var outline = textGo.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 0.1f, 0.2f, 0.85f);
+            outline.effectDistance = new Vector2(2f, -2f);
             var tRect = statusText.rectTransform;
             tRect.anchorMin = new Vector2(0f, 1f);
             tRect.anchorMax = new Vector2(0f, 1f);
             tRect.pivot = new Vector2(0f, 1f);
             tRect.anchoredPosition = new Vector2(30f, -25f);
-            tRect.sizeDelta = new Vector2(1400f, 140f);
+            tRect.sizeDelta = new Vector2(1500f, 140f);
+
+            // Interact Prompt Text (Center-Bottom)
+            var promptGo = new GameObject("InteractPrompt");
+            promptGo.transform.SetParent(canvasGo.transform, false);
+            var promptText = promptGo.AddComponent<Text>();
+            promptText.font = hudFont;
+            promptText.fontSize = 26;
+            promptText.alignment = TextAnchor.MiddleCenter;
+            promptText.color = new Color(0.25f, 0.95f, 1f);
+            promptText.raycastTarget = false;
+            var pOutline = promptGo.AddComponent<Outline>();
+            pOutline.effectColor = new Color(0f, 0f, 0f, 0.9f);
+            pOutline.effectDistance = new Vector2(2f, -2f);
+            var pRect = promptText.rectTransform;
+            pRect.anchorMin = new Vector2(0.5f, 0.5f);
+            pRect.anchorMax = new Vector2(0.5f, 0.5f);
+            pRect.anchoredPosition = new Vector2(0f, -120f);
+            pRect.sizeDelta = new Vector2(700f, 60f);
 
             // Dash Bar BG + Fill
             var dashBgGo = new GameObject("DashBarBG");
             dashBgGo.transform.SetParent(canvasGo.transform, false);
             var dashBg = dashBgGo.AddComponent<Image>();
-            dashBg.color = new Color(0f, 0f, 0f, 0.55f);
+            dashBg.color = new Color(0.05f, 0.08f, 0.15f, 0.75f);
             var bgRect = dashBg.rectTransform;
             bgRect.anchorMin = new Vector2(0f, 1f);
             bgRect.anchorMax = new Vector2(0f, 1f);
             bgRect.pivot = new Vector2(0f, 1f);
             bgRect.anchoredPosition = new Vector2(30f, -110f);
-            bgRect.sizeDelta = new Vector2(240f, 16f);
+            bgRect.sizeDelta = new Vector2(260f, 16f);
 
             var dashFillGo = new GameObject("DashBarFill");
             dashFillGo.transform.SetParent(dashBgGo.transform, false);
             var dashFill = dashFillGo.AddComponent<Image>();
-            dashFill.color = new Color(0.25f, 0.9f, 1f, 1f);
+            dashFill.color = new Color(0.15f, 0.95f, 1f, 1f);
             dashFill.type = Image.Type.Filled;
             dashFill.fillMethod = Image.FillMethod.Horizontal;
             var fillRect = dashFill.rectTransform;
@@ -494,7 +657,20 @@ namespace GungeonFPS.Editor
             wcSo.FindProperty("hudWeaponImage").objectReferenceValue = weaponImg;
             wcSo.FindProperty("hudWeaponRect").objectReferenceValue = wRect;
             wcSo.FindProperty("hudMuzzleFlash").objectReferenceValue = muzzleImg;
+            wcSo.FindProperty("viewmodelRoot").objectReferenceValue = viewmodelRoot;
+            wcSo.FindProperty("muzzleLight").objectReferenceValue = muzzleLight;
+            wcSo.FindProperty("gunCoreMaterial").objectReferenceValue = gunCoreMat;
             wcSo.ApplyModifiedPropertiesWithoutUndo();
+
+            // Wire SecondaryWeaponController
+            var sc = playerGo.AddComponent<SecondaryWeaponController>();
+            var scSo = new SerializedObject(sc);
+            scSo.FindProperty("equippedSecondary").objectReferenceValue = defaultSecondary;
+            scSo.FindProperty("playerCamera").objectReferenceValue = cam;
+            scSo.FindProperty("bladeViewmodel").objectReferenceValue = bladeViewmodel;
+            scSo.FindProperty("shieldViewmodel").objectReferenceValue = shieldViewmodel;
+            scSo.FindProperty("shieldBlocker").objectReferenceValue = shieldBlocker;
+            scSo.ApplyModifiedPropertiesWithoutUndo();
 
             // Wire GameHUD
             var hud = canvasGo.AddComponent<GameHUD>();
@@ -502,10 +678,237 @@ namespace GungeonFPS.Editor
             hudSo.FindProperty("playerHealth").objectReferenceValue = playerHealth;
             hudSo.FindProperty("playerController").objectReferenceValue = playerCtrl;
             hudSo.FindProperty("weaponController").objectReferenceValue = wc;
+            hudSo.FindProperty("secondaryController").objectReferenceValue = sc;
             hudSo.FindProperty("statusText").objectReferenceValue = statusText;
+            hudSo.FindProperty("interactPromptText").objectReferenceValue = promptText;
             hudSo.FindProperty("dashFillBar").objectReferenceValue = dashFill;
             hudSo.FindProperty("hitmarkerImage").objectReferenceValue = hitImg;
             hudSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static Transform Build3DNeonShotgun(Transform cameraTransform, out Light muzzleLight, out Material coreMat)
+        {
+            var root = new GameObject("Viewmodel_NeonShotgun");
+            root.transform.SetParent(cameraTransform);
+            root.transform.localPosition = new Vector3(0.28f, -0.24f, 0.48f);
+            root.transform.localRotation = Quaternion.identity;
+
+            Shader litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+
+            Material bodyMat = new Material(litShader) { color = new Color(0.14f, 0.15f, 0.19f) };
+            bodyMat.SetFloat("_Metallic", 0.65f);
+            bodyMat.SetFloat("_Smoothness", 0.55f);
+            AssetDatabase.CreateAsset(bodyMat, ArtPath + "/GunBodyMat.mat");
+
+            Material railMat = new Material(litShader) { color = new Color(0.28f, 0.30f, 0.36f) };
+            railMat.SetFloat("_Metallic", 0.8f);
+            railMat.SetFloat("_Smoothness", 0.7f);
+            AssetDatabase.CreateAsset(railMat, ArtPath + "/GunRailMat.mat");
+
+            coreMat = new Material(litShader) { color = new Color(0.1f, 0.9f, 1f) };
+            coreMat.EnableKeyword("_EMISSION");
+            coreMat.SetColor("_EmissionColor", new Color(0.15f, 0.95f, 1f) * 2.4f);
+            AssetDatabase.CreateAsset(coreMat, ArtPath + "/GunCoreMat.mat");
+
+            // Main Receiver
+            CreateViewPart(root.transform, "Receiver", PrimitiveType.Cube, new Vector3(0f, 0f, 0f), new Vector3(0.085f, 0.11f, 0.34f), bodyMat);
+            // Angled Foregrip / Pump
+            CreateViewPart(root.transform, "Pump", PrimitiveType.Cube, new Vector3(0f, -0.055f, 0.22f), new Vector3(0.075f, 0.055f, 0.18f), railMat);
+            // Twin Rail Barrels (Upper & Lower)
+            CreateViewPart(root.transform, "Barrel_Top", PrimitiveType.Cube, new Vector3(0f, 0.032f, 0.32f), new Vector3(0.05f, 0.03f, 0.42f), railMat);
+            CreateViewPart(root.transform, "Barrel_Bottom", PrimitiveType.Cube, new Vector3(0f, -0.01f, 0.28f), new Vector3(0.045f, 0.025f, 0.34f), bodyMat);
+            // Glowing Neon Energy Core & Side Rails
+            CreateViewPart(root.transform, "PlasmaCore", PrimitiveType.Cylinder, new Vector3(0f, 0.015f, 0.06f), new Vector3(0.045f, 0.08f, 0.045f), coreMat, Quaternion.Euler(90f, 0f, 0f));
+            CreateViewPart(root.transform, "SideStrip_L", PrimitiveType.Cube, new Vector3(-0.044f, 0.015f, 0.18f), new Vector3(0.008f, 0.016f, 0.28f), coreMat);
+            CreateViewPart(root.transform, "SideStrip_R", PrimitiveType.Cube, new Vector3(0.044f, 0.015f, 0.18f), new Vector3(0.008f, 0.016f, 0.28f), coreMat);
+
+            // Muzzle Light
+            var lightGo = new GameObject("MuzzleLight");
+            lightGo.transform.SetParent(root.transform);
+            lightGo.transform.localPosition = new Vector3(0f, 0.02f, 0.58f);
+            muzzleLight = lightGo.AddComponent<Light>();
+            muzzleLight.type = LightType.Point;
+            muzzleLight.range = 7f;
+            muzzleLight.intensity = 4f;
+            muzzleLight.color = new Color(0.2f, 0.95f, 1f);
+            muzzleLight.enabled = false;
+
+            return root.transform;
+        }
+
+        private static Transform Build3DNeonBlade(Transform cameraTransform)
+        {
+            var root = new GameObject("Viewmodel_NeonBlade");
+            root.transform.SetParent(cameraTransform);
+            root.transform.localPosition = new Vector3(-0.32f, -0.25f, 0.45f);
+            root.transform.localRotation = Quaternion.Euler(10f, 15f, -15f);
+
+            Shader litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Material hiltMat = new Material(litShader) { color = new Color(0.16f, 0.17f, 0.22f) };
+            AssetDatabase.CreateAsset(hiltMat, ArtPath + "/BladeHiltMat.mat");
+
+            Material edgeMat = new Material(litShader) { color = new Color(0.2f, 0.95f, 1f) };
+            edgeMat.EnableKeyword("_EMISSION");
+            edgeMat.SetColor("_EmissionColor", new Color(0.2f, 0.95f, 1f) * 2.5f);
+            AssetDatabase.CreateAsset(edgeMat, ArtPath + "/BladeEdgeMat.mat");
+
+            CreateViewPart(root.transform, "Hilt", PrimitiveType.Cylinder, new Vector3(0f, -0.1f, 0f), new Vector3(0.03f, 0.08f, 0.03f), hiltMat);
+            CreateViewPart(root.transform, "Guard", PrimitiveType.Cube, new Vector3(0f, -0.01f, 0f), new Vector3(0.08f, 0.02f, 0.04f), hiltMat);
+            CreateViewPart(root.transform, "Blade", PrimitiveType.Cube, new Vector3(0f, 0.24f, 0f), new Vector3(0.018f, 0.48f, 0.045f), edgeMat);
+            return root.transform;
+        }
+
+        private static Transform Build3DAegisShield(Transform cameraTransform, out ShieldBlocker blocker)
+        {
+            var root = new GameObject("Viewmodel_AegisShield");
+            root.transform.SetParent(cameraTransform);
+            root.transform.localPosition = new Vector3(-0.38f, -0.28f, 0.48f);
+            root.transform.localRotation = Quaternion.identity;
+
+            Shader litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Material shieldMat = new Material(litShader) { color = new Color(0.15f, 0.85f, 1f, 0.45f) };
+            shieldMat.SetFloat("_Surface", 1f); // Transparent in URP Lit
+            shieldMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            shieldMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            shieldMat.SetInt("_ZWrite", 0);
+            shieldMat.renderQueue = 3000;
+            shieldMat.EnableKeyword("_EMISSION");
+            shieldMat.SetColor("_EmissionColor", new Color(0.15f, 0.85f, 1f) * 1.6f);
+            AssetDatabase.CreateAsset(shieldMat, ArtPath + "/ShieldMat.mat");
+
+            var panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            panel.name = "ShieldBarrier";
+            panel.tag = "Player";
+            panel.transform.SetParent(root.transform);
+            panel.transform.localPosition = Vector3.zero;
+            panel.transform.localScale = new Vector3(0.75f, 0.65f, 0.04f);
+            panel.GetComponent<Renderer>().sharedMaterial = shieldMat;
+            blocker = panel.AddComponent<ShieldBlocker>();
+
+            return root.transform;
+        }
+
+        private static GameObject CreateWeaponPickupPrefab()
+        {
+            var go = new GameObject("WeaponPickup");
+            var mesh = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            mesh.name = "Visual";
+            Object.DestroyImmediate(mesh.GetComponent<Collider>());
+            mesh.transform.SetParent(go.transform);
+            mesh.transform.localRotation = Quaternion.Euler(45f, 45f, 0f);
+            mesh.transform.localScale = Vector3.one * 0.55f;
+
+            Shader litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            Material mat = new Material(litShader) { color = Color.cyan };
+            mat.EnableKeyword("_EMISSION");
+            mat.SetColor("_EmissionColor", Color.cyan * 2f);
+            AssetDatabase.CreateAsset(mat, ArtPath + "/WeaponPickupMat.mat");
+            mesh.GetComponent<Renderer>().sharedMaterial = mat;
+
+            var pickup = go.AddComponent<WeaponPickup>();
+            var so = new SerializedObject(pickup);
+            so.FindProperty("visualRenderer").objectReferenceValue = mesh.GetComponent<Renderer>();
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            string path = $"{PrefabPath}/WeaponPickup.prefab";
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
+            Object.DestroyImmediate(go);
+            return prefab;
+        }
+
+        private static GameObject CreateChestPrefab(GameObject weaponPickupPrefab, WeaponData[] mainPool, SecondaryWeaponData[] secPool)
+        {
+            var go = new GameObject("Chest_Neon");
+            Shader litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+
+            Material baseMat = new Material(litShader) { color = new Color(0.14f, 0.16f, 0.22f) };
+            AssetDatabase.CreateAsset(baseMat, ArtPath + "/ChestBaseMat.mat");
+            Material trimMat = new Material(litShader) { color = new Color(0.2f, 0.95f, 1f) };
+            trimMat.EnableKeyword("_EMISSION");
+            trimMat.SetColor("_EmissionColor", new Color(0.2f, 0.95f, 1f) * 2.2f);
+            AssetDatabase.CreateAsset(trimMat, ArtPath + "/ChestTrimMat.mat");
+
+            var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            body.name = "Body";
+            body.transform.SetParent(go.transform);
+            body.transform.localPosition = new Vector3(0f, 0.35f, 0f);
+            body.transform.localScale = new Vector3(1.2f, 0.7f, 0.85f);
+            body.GetComponent<Renderer>().sharedMaterial = baseMat;
+
+            var trim = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            trim.name = "NeonTrim";
+            Object.DestroyImmediate(trim.GetComponent<Collider>());
+            trim.transform.SetParent(go.transform);
+            trim.transform.localPosition = new Vector3(0f, 0.68f, 0f);
+            trim.transform.localScale = new Vector3(1.24f, 0.08f, 0.89f);
+            trim.GetComponent<Renderer>().sharedMaterial = trimMat;
+
+            var lidPivot = new GameObject("LidPivot");
+            lidPivot.transform.SetParent(go.transform);
+            lidPivot.transform.localPosition = new Vector3(0f, 0.7f, 0.42f);
+
+            var lid = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            lid.name = "Lid";
+            Object.DestroyImmediate(lid.GetComponent<Collider>());
+            lid.transform.SetParent(lidPivot.transform);
+            lid.transform.localPosition = new Vector3(0f, 0.12f, -0.42f);
+            lid.transform.localScale = new Vector3(1.2f, 0.24f, 0.85f);
+            lid.GetComponent<Renderer>().sharedMaterial = baseMat;
+
+            var chest = go.AddComponent<ChestController>();
+            var so = new SerializedObject(chest);
+            so.FindProperty("weaponPickupPrefab").objectReferenceValue = weaponPickupPrefab;
+            so.FindProperty("lidTransform").objectReferenceValue = lidPivot.transform;
+
+            var mainProp = so.FindProperty("mainWeaponPool");
+            mainProp.ClearArray();
+            for (int i = 0; i < mainPool.Length; i++)
+            {
+                mainProp.InsertArrayElementAtIndex(i);
+                mainProp.GetArrayElementAtIndex(i).objectReferenceValue = mainPool[i];
+            }
+
+            var secProp = so.FindProperty("secondaryWeaponPool");
+            secProp.ClearArray();
+            for (int i = 0; i < secPool.Length; i++)
+            {
+                secProp.InsertArrayElementAtIndex(i);
+                secProp.GetArrayElementAtIndex(i).objectReferenceValue = secPool[i];
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            string path = $"{PrefabPath}/Chest_Neon.prefab";
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
+            Object.DestroyImmediate(go);
+            return prefab;
+        }
+
+        private static SecondaryWeaponData CreateOrUpdateSecondary(string assetName, System.Action<SecondaryWeaponData> configure)
+        {
+            string path = $"{DataPath}/{assetName}.asset";
+            var sec = AssetDatabase.LoadAssetAtPath<SecondaryWeaponData>(path);
+            if (sec == null)
+            {
+                sec = ScriptableObject.CreateInstance<SecondaryWeaponData>();
+                AssetDatabase.CreateAsset(sec, path);
+            }
+            configure(sec);
+            EditorUtility.SetDirty(sec);
+            return sec;
+        }
+
+        private static void CreateViewPart(
+            Transform parent, string name, PrimitiveType type,
+            Vector3 localPos, Vector3 localScale, Material mat, Quaternion? localRot = null)
+        {
+            var go = GameObject.CreatePrimitive(type);
+            go.name = name;
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            go.transform.SetParent(parent);
+            go.transform.localPosition = localPos;
+            go.transform.localScale = localScale;
+            if (localRot.HasValue) go.transform.localRotation = localRot.Value;
+            go.GetComponent<Renderer>().sharedMaterial = mat;
         }
 
         private static GameObject CreateBulletPrefab(string name, Sprite sprite, System.Type scriptType)
@@ -538,7 +941,7 @@ namespace GungeonFPS.Editor
             var vis = new GameObject("Visual");
             vis.transform.SetParent(go.transform);
             vis.transform.localPosition = new Vector3(0f, 0.95f, 0f);
-            vis.transform.localScale = Vector3.one * 1.25f;
+            vis.transform.localScale = Vector3.one * 1.35f;
             var sr = vis.AddComponent<SpriteRenderer>();
             sr.sprite = sprite;
             vis.AddComponent<BillboardSprite>();
@@ -632,36 +1035,18 @@ namespace GungeonFPS.Editor
             return AssetDatabase.LoadAssetAtPath<Sprite>(fullPath);
         }
 
-        private static Texture2D CreateFloorTexture()
+        private static Texture2D CreateNeonGridTexture(Color bg, Color line)
         {
-            var tex = new Texture2D(16, 16);
-            Color c1 = new Color(0.28f, 0.3f, 0.36f);
-            Color c2 = new Color(0.22f, 0.24f, 0.3f);
-            for (int y = 0; y < 16; y++)
+            var tex = new Texture2D(32, 32);
+            for (int y = 0; y < 32; y++)
             {
-                for (int x = 0; x < 16; x++)
+                for (int x = 0; x < 32; x++)
                 {
-                    bool checker = ((x / 8) + (y / 8)) % 2 == 0;
-                    tex.SetPixel(x, y, checker ? c1 : c2);
-                }
-            }
-            tex.Apply();
-            return tex;
-        }
-
-        private static Texture2D CreateWallTexture()
-        {
-            var tex = new Texture2D(16, 16);
-            Color mortar = new Color(0.25f, 0.23f, 0.28f);
-            Color brick = new Color(0.45f, 0.43f, 0.5f);
-            for (int y = 0; y < 16; y++)
-            {
-                for (int x = 0; x < 16; x++)
-                {
-                    bool rowLine = y == 0 || y == 8;
-                    int offset = (y < 8) ? 0 : 8;
-                    bool colLine = (x + offset) % 16 == 0;
-                    tex.SetPixel(x, y, (rowLine || colLine) ? mortar : brick);
+                    bool edge = x == 0 || y == 0 || x == 31 || y == 31;
+                    bool sub = x == 16 || y == 16;
+                    if (edge) tex.SetPixel(x, y, line);
+                    else if (sub) tex.SetPixel(x, y, Color.Lerp(bg, line, 0.35f));
+                    else tex.SetPixel(x, y, bg);
                 }
             }
             tex.Apply();
@@ -688,7 +1073,7 @@ namespace GungeonFPS.Editor
             return tex;
         }
 
-        private static Texture2D CreateMuzzleFlashTexture()
+        private static Texture2D CreateMuzzleFlashTexture(Color tint)
         {
             var tex = new Texture2D(16, 16, TextureFormat.RGBA32, false);
             for (int y = 0; y < 16; y++)
@@ -698,7 +1083,7 @@ namespace GungeonFPS.Editor
                     int dx = Mathf.Abs(x - 7);
                     int dy = Mathf.Abs(y - 7);
                     bool star = (dx <= 1 && dy <= 6) || (dy <= 1 && dx <= 6) || (dx + dy <= 4);
-                    tex.SetPixel(x, y, star ? (dx + dy <= 2 ? Color.white : new Color(1f, 0.85f, 0.2f)) : Color.clear);
+                    tex.SetPixel(x, y, star ? (dx + dy <= 2 ? Color.white : tint) : Color.clear);
                 }
             }
             tex.Apply();
@@ -722,22 +1107,22 @@ namespace GungeonFPS.Editor
             return tex;
         }
 
-        private static Texture2D CreateBulletKinTexture(Color bodyColor, Color bandColor)
+        private static Texture2D CreateNeonDroneTexture(Color shell, Color core)
         {
             var tex = new Texture2D(24, 24, TextureFormat.RGBA32, false);
             for (int y = 0; y < 24; y++)
             {
                 for (int x = 0; x < 24; x++)
                 {
+                    int dx = Mathf.Abs(x - 12);
+                    int dy = Mathf.Abs(y - 12);
                     Color c = Color.clear;
-                    bool inBody = x >= 6 && x <= 17 && y >= 2 && y <= 18;
-                    bool inTip = x >= 8 && x <= 15 && y >= 19 && y <= 21;
-                    if (inBody || inTip)
+                    if (dx + dy <= 9)
                     {
-                        c = bodyColor;
-                        if (y == 14 || y == 15) c = bandColor;
-                        if (y >= 10 && y <= 12 && (x == 9 || x == 14)) c = Color.black;
-                        if (y == 2 || x == 6 || x == 17) c = bodyColor * 0.6f;
+                        c = shell;
+                        if (dx + dy >= 8) c = Color.Lerp(shell, core, 0.55f); // neon rim
+                        if (dx <= 2 && dy <= 2) c = core; // glowing eye
+                        if (dx <= 1 && dy <= 1) c = Color.white;
                     }
                     tex.SetPixel(x, y, c);
                 }
@@ -746,16 +1131,24 @@ namespace GungeonFPS.Editor
             return tex;
         }
 
-        private static Texture2D CreateGunTexture(Color metal, Color grip)
+        private static Texture2D CreateNeonTurretTexture(Color shell, Color core)
         {
-            var tex = new Texture2D(32, 24, TextureFormat.RGBA32, false);
+            var tex = new Texture2D(24, 24, TextureFormat.RGBA32, false);
             for (int y = 0; y < 24; y++)
             {
-                for (int x = 0; x < 32; x++)
+                for (int x = 0; x < 24; x++)
                 {
+                    int dx = Mathf.Abs(x - 12);
+                    int dy = Mathf.Abs(y - 12);
                     Color c = Color.clear;
-                    if (x >= 10 && x <= 26 && y >= 12 && y <= 17) c = metal;
-                    if (x >= 11 && x <= 15 && y >= 3 && y <= 11) c = grip;
+                    bool inHex = dx <= 8 && dy <= 9 && (dx + dy <= 14);
+                    if (inHex)
+                    {
+                        c = shell;
+                        if (dx == 8 || dy == 9 || dx + dy == 14) c = core;
+                        if (dx <= 3 && dy <= 2) c = core;
+                        if (dx <= 1 && dy <= 1) c = Color.white;
+                    }
                     tex.SetPixel(x, y, c);
                 }
             }
@@ -763,19 +1156,33 @@ namespace GungeonFPS.Editor
             return tex;
         }
 
-        private static Texture2D CreateShotgunTexture()
+        private static Texture2D CreateNeonShotgunTexture()
         {
-            var tex = new Texture2D(32, 24, TextureFormat.RGBA32, false);
-            Color metal = new Color(0.45f, 0.48f, 0.55f);
-            Color wood = new Color(0.55f, 0.3f, 0.14f);
-            for (int y = 0; y < 24; y++)
+            var tex = new Texture2D(64, 48, TextureFormat.RGBA32, false);
+            Color darkMetal = new Color(0.11f, 0.13f, 0.18f);
+            Color midMetal = new Color(0.22f, 0.26f, 0.34f);
+            Color neonCyan = new Color(0.15f, 0.92f, 1f);
+            Color neonWhite = new Color(0.85f, 0.98f, 1f);
+
+            for (int y = 0; y < 48; y++)
             {
-                for (int x = 0; x < 32; x++)
+                for (int x = 0; x < 64; x++)
                 {
                     Color c = Color.clear;
-                    if (x >= 8 && x <= 29 && y >= 12 && y <= 16) c = metal;
-                    if (x >= 4 && x <= 14 && y >= 5 && y <= 11) c = wood;
-                    if (x >= 17 && x <= 24 && y >= 10 && y <= 12) c = wood;
+                    // Stock / Grip
+                    if (x >= 8 && x <= 24 && y >= 8 && y <= 22) c = darkMetal;
+                    // Main Receiver
+                    if (x >= 20 && x <= 44 && y >= 18 && y <= 31) c = midMetal;
+                    // Upper & Lower SF Rail Barrels
+                    if (x >= 38 && x <= 60 && y >= 24 && y <= 30) c = darkMetal;
+                    if (x >= 34 && x <= 56 && y >= 18 && y <= 22) c = midMetal;
+
+                    // Glowing Neon Cyan Plasma Core & Rail Strips
+                    if (x >= 24 && x <= 38 && y >= 22 && y <= 25) c = neonCyan;
+                    if (x >= 28 && x <= 34 && y >= 23 && y <= 24) c = neonWhite;
+                    if (x >= 40 && x <= 59 && y == 27) c = neonCyan;
+                    if (x == 60 && y >= 25 && y <= 29) c = neonWhite; // muzzle glow
+
                     tex.SetPixel(x, y, c);
                 }
             }

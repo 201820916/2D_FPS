@@ -27,7 +27,10 @@ namespace GungeonFPS.Core
             go.transform.position = position;
 
             var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
             var main = ps.main;
+            main.playOnAwake = false;
             main.duration = 0.35f;
             main.loop = false;
             main.startLifetime = new ParticleSystem.MinMaxCurve(0.18f, 0.35f);

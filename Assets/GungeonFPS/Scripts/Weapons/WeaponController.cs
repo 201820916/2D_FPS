@@ -16,10 +16,15 @@ namespace GungeonFPS.Weapons
         [SerializeField] private Camera playerCamera;
         [SerializeField] private PlayerController playerController;
 
-        [Header("2D HUD Weapon")]
+        [Header("2D HUD Weapon (Optional)")]
         [SerializeField] private Image hudWeaponImage;
         [SerializeField] private RectTransform hudWeaponRect;
         [SerializeField] private Image hudMuzzleFlash;
+
+        [Header("3D Viewmodel Weapon (Optional)")]
+        [SerializeField] private Transform viewmodelRoot;
+        [SerializeField] private Light muzzleLight;
+        [SerializeField] private Material gunCoreMaterial;
 
         public WeaponData CurrentWeapon => weapons.Count > 0 ? weapons[_currentIndex] : null;
         public int CurrentMagAmmo => _magAmmo != null && _magAmmo.Length > _currentIndex ? _magAmmo[_currentIndex] : 0;
@@ -36,12 +41,15 @@ namespace GungeonFPS.Weapons
         private float _muzzleFlashTimer;
         private float _bobTimer;
         private Vector2 _baseHudPos;
+        private Vector3 _baseViewmodelPos;
 
         private void Awake()
         {
             if (playerCamera == null) playerCamera = Camera.main;
             if (playerController == null) playerController = GetComponentInParent<PlayerController>();
             if (hudWeaponRect != null) _baseHudPos = hudWeaponRect.anchoredPosition;
+            if (viewmodelRoot != null) _baseViewmodelPos = viewmodelRoot.localPosition;
+            if (muzzleLight != null) muzzleLight.enabled = false;
 
             InitAmmo();
             ApplyWeaponVisual();
@@ -178,6 +186,11 @@ namespace GungeonFPS.Weapons
                 hudMuzzleFlash.color = weapon.projectileColor;
                 hudMuzzleFlash.rectTransform.localEulerAngles = new Vector3(0f, 0f, Random.Range(0f, 360f));
             }
+            if (muzzleLight != null)
+            {
+                muzzleLight.color = weapon.projectileColor;
+                muzzleLight.enabled = true;
+            }
 
             ScreenEffects.Instance?.AddShake(weapon.screenShake);
 
@@ -215,12 +228,38 @@ namespace GungeonFPS.Weapons
             return Quaternion.Euler(pitch, yaw, 0f) * dir;
         }
 
+        public WeaponData EquipMainWeapon(WeaponData newWeapon)
+        {
+            if (newWeapon == null) return null;
+            WeaponData previous = CurrentWeapon;
+            if (weapons.Count == 0)
+            {
+                weapons.Add(newWeapon);
+                _currentIndex = 0;
+            }
+            else
+            {
+                weapons[_currentIndex] = newWeapon;
+            }
+
+            _reloadTimer = 0f;
+            _nextFireTime = 0f;
+            InitAmmo();
+            ApplyWeaponVisual();
+            return previous;
+        }
+
         private void ApplyWeaponVisual()
         {
             if (hudWeaponImage != null && CurrentWeapon != null && CurrentWeapon.hudSprite != null)
             {
                 hudWeaponImage.sprite = CurrentWeapon.hudSprite;
                 hudWeaponImage.preserveAspect = true;
+            }
+            if (gunCoreMaterial != null && CurrentWeapon != null)
+            {
+                gunCoreMaterial.color = CurrentWeapon.projectileColor;
+                gunCoreMaterial.SetColor("_EmissionColor", CurrentWeapon.projectileColor * 2.4f);
             }
         }
 
@@ -229,11 +268,12 @@ namespace GungeonFPS.Weapons
             if (_muzzleFlashTimer > 0f)
             {
                 _muzzleFlashTimer -= Time.deltaTime;
-                if (_muzzleFlashTimer <= 0f && hudMuzzleFlash != null)
-                    hudMuzzleFlash.enabled = false;
+                if (_muzzleFlashTimer <= 0f)
+                {
+                    if (hudMuzzleFlash != null) hudMuzzleFlash.enabled = false;
+                    if (muzzleLight != null) muzzleLight.enabled = false;
+                }
             }
-
-            if (hudWeaponRect == null) return;
 
             _recoilOffset = Mathf.Lerp(_recoilOffset, 0f, Time.deltaTime * 16f);
             _recoilAngle = Mathf.Lerp(_recoilAngle, 0f, Time.deltaTime * 16f);
@@ -244,11 +284,23 @@ namespace GungeonFPS.Weapons
             else
                 _bobTimer = 0f;
 
-            float bobX = Mathf.Cos(_bobTimer * 0.5f) * (speed > 0.5f ? 8f : 0f);
-            float bobY = Mathf.Abs(Mathf.Sin(_bobTimer)) * (speed > 0.5f ? 8f : 0f);
-            float reloadDip = _reloadTimer > 0f ? -90f : 0f;
+            float bobX = Mathf.Cos(_bobTimer * 0.5f) * (speed > 0.5f ? 1f : 0f);
+            float bobY = Mathf.Abs(Mathf.Sin(_bobTimer)) * (speed > 0.5f ? 1f : 0f);
 
-            hudWeaponRect.anchoredPosition = _baseHudPos + new Vector2(bobX, -bobY - _recoilOffset + reloadDip);
+            if (viewmodelRoot != null)
+            {
+                float kickBack = (_recoilOffset / 48f) * 0.14f;
+                float reloadDip3D = _reloadTimer > 0f ? -0.18f : 0f;
+                float reloadRoll = _reloadTimer > 0f ? 32f : 0f;
+
+                viewmodelRoot.localPosition = _baseViewmodelPos + new Vector3(bobX * 0.014f, -bobY * 0.014f + reloadDip3D, -kickBack);
+                viewmodelRoot.localRotation = Quaternion.Euler(_recoilAngle * 2.2f, 0f, reloadRoll);
+            }
+
+            if (hudWeaponRect == null) return;
+
+            float reloadDip = _reloadTimer > 0f ? -90f : 0f;
+            hudWeaponRect.anchoredPosition = _baseHudPos + new Vector2(bobX * 8f, -bobY * 8f - _recoilOffset + reloadDip);
             hudWeaponRect.localEulerAngles = new Vector3(0f, 0f, _recoilAngle);
         }
     }

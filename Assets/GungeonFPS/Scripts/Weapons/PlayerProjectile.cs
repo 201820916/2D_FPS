@@ -49,7 +49,7 @@ namespace GungeonFPS.Weapons
             float step = _speed * Time.deltaTime;
             if (Physics.SphereCast(transform.position, hitRadius, _direction, out RaycastHit hit, step, ~0, QueryTriggerInteraction.Ignore))
             {
-                if (hit.collider.CompareTag("Player"))
+                if (hit.collider.CompareTag("Player") || hit.collider.GetComponent<ShieldBlocker>() != null)
                 {
                     transform.position += _direction * step;
                     return;

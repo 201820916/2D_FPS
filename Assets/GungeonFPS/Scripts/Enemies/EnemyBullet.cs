@@ -47,6 +47,14 @@ namespace GungeonFPS.Enemies
             float step = _speed * Time.deltaTime;
             if (Physics.SphereCast(transform.position, hitRadius, _direction, out RaycastHit hit, step, ~0, QueryTriggerInteraction.Ignore))
             {
+                if (hit.collider.TryGetComponent<GungeonFPS.Weapons.ShieldBlocker>(out var shield) && shield.IsBlocking)
+                {
+                    VfxSpawner.Instance?.SpawnBurst(hit.point, new Color(0.25f, 0.95f, 1f), 5, 4f, 0.1f);
+                    RetroAudio.Instance?.Play(SfxType.Bounce, 0.5f);
+                    Despawn();
+                    return;
+                }
+
                 if (hit.collider.CompareTag("Player") && hit.collider.TryGetComponent<IDamageable>(out var playerDmg))
                 {
                     playerDmg.TakeDamage(_damage, _direction, 0f);
@@ -72,6 +80,24 @@ namespace GungeonFPS.Enemies
                 if (bullet != null && bullet.gameObject.activeSelf)
                     bullet.Despawn();
             }
+        }
+
+        public static int ClearBulletsInSphere(Vector3 center, float radius)
+        {
+            int cleared = 0;
+            float rSq = radius * radius;
+            var snapshot = new List<EnemyBullet>(ActiveBullets);
+            foreach (var bullet in snapshot)
+            {
+                if (bullet == null || !bullet.gameObject.activeSelf) continue;
+                if ((bullet.transform.position - center).sqrMagnitude <= rSq)
+                {
+                    VfxSpawner.Instance?.SpawnBurst(bullet.transform.position, new Color(0.25f, 0.95f, 1f), 4, 4f, 0.1f);
+                    bullet.Despawn();
+                    cleared++;
+                }
+            }
+            return cleared;
         }
 
         private void Despawn()
