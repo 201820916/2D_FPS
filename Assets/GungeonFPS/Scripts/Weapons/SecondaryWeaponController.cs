@@ -31,10 +31,12 @@ namespace GungeonFPS.Weapons
         public bool IsShieldActive => equippedSecondary != null &&
                                       equippedSecondary.secondaryType == SecondaryWeaponType.AegisShield &&
                                       shieldBlocker != null && shieldBlocker.IsBlocking;
+        public bool IsShieldDepleted => _shieldDepleted;
 
         private float _cooldownTimer;
         private float _swingTimer;
         private float _shieldEnergy;
+        private bool _shieldDepleted;
         private Vector3 _bladeRestPos;
         private Quaternion _bladeRestRot;
         private Vector3 _shieldRestPos;
@@ -62,6 +64,7 @@ namespace GungeonFPS.Weapons
             equippedSecondary = newSecondary;
             _cooldownTimer = 0f;
             _swingTimer = 0f;
+            _shieldDepleted = false;
             if (equippedSecondary != null)
                 _shieldEnergy = equippedSecondary.maxEnergy;
             RefreshViewmodels();
@@ -154,17 +157,28 @@ namespace GungeonFPS.Weapons
 
         private void UpdateShield()
         {
-            bool holding = Cursor.lockState == CursorLockMode.Locked &&
-                           Mouse.current.rightButton.isPressed &&
-                           _shieldEnergy > 1f;
+            bool wantsBlock = Cursor.lockState == CursorLockMode.Locked &&
+                              Mouse.current.rightButton.isPressed;
+
+            bool holding = wantsBlock && !_shieldDepleted && _shieldEnergy > 0f;
 
             if (holding)
             {
-                _shieldEnergy = Mathf.Max(0f, _shieldEnergy - equippedSecondary.drainPerSecond * Time.deltaTime);
+                _shieldEnergy -= equippedSecondary.drainPerSecond * Time.deltaTime;
+                if (_shieldEnergy <= 0f)
+                {
+                    _shieldEnergy = 0f;
+                    _shieldDepleted = true;
+                    holding = false;
+                }
             }
             else
             {
                 _shieldEnergy = Mathf.Min(equippedSecondary.maxEnergy, _shieldEnergy + equippedSecondary.regenPerSecond * Time.deltaTime);
+                if (_shieldDepleted && _shieldEnergy >= equippedSecondary.maxEnergy)
+                {
+                    _shieldDepleted = false;
+                }
             }
 
             if (shieldBlocker != null)

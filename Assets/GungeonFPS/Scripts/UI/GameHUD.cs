@@ -99,7 +99,8 @@ namespace GungeonFPS.UI
                 {
                     var s = secondaryController.CurrentSecondary;
                     int pct = Mathf.RoundToInt(secondaryController.CooldownOrEnergyNormalized * 100f);
-                    secStr = $"   |   [SEC / RMB] {s.weaponName} ({pct}%)   |   [SHIFT] DASH   |   [TAB] BAG";
+                    string state = secondaryController.IsShieldDepleted ? " [RECHARGING]" : "";
+                    secStr = $"   |   [SEC / RMB] {s.weaponName} ({pct}%){state}   |   [SHIFT] DASH   |   [TAB] BAG";
                 }
 
                 statusText.text = hpStr + blankStr + roomStr + mainStr + secStr;

@@ -145,6 +145,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 7a8d1e7058df84843a920151b2bdbb10, type: 2}
   - {fileID: 11400000, guid: e87e1389a61935a46a97186bb67d11b7, type: 2}
   weaponPickupPrefab: {fileID: 196033413723426709, guid: bd1a19462b7423c45b2ae6aae2e60eac, type: 3}
+  dropBothMainAndSecondary: 1
   lidTransform: {fileID: 2626922456257655117}
   interactRadius: 3
 --- !u!1 &2148495146012077915

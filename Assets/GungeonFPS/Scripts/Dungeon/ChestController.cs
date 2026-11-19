@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using GungeonFPS.Core;
+using GungeonFPS.Player;
 using GungeonFPS.UI;
 using GungeonFPS.Weapons;
 
@@ -55,17 +56,71 @@ namespace GungeonFPS.Dungeon
             GameObject go = Instantiate(weaponPickupPrefab, spawnPos, Quaternion.identity);
             if (!go.TryGetComponent<WeaponPickup>(out var pickup)) return;
 
-            bool pickMain = mainWeaponPool.Count > 0 && (secondaryWeaponPool.Count == 0 || Random.value < 0.6f);
-            if (pickMain)
+            var unownedMain = GetUnownedMainList();
+            var unownedSec = GetUnownedSecondaryList();
+            int totalUnowned = unownedMain.Count + unownedSec.Count;
+
+            if (totalUnowned > 0)
             {
-                WeaponData chosen = mainWeaponPool[Random.Range(0, mainWeaponPool.Count)];
-                pickup.SetupMain(chosen);
+                int roll = Random.Range(0, totalUnowned);
+                if (roll < unownedMain.Count)
+                    pickup.SetupMain(unownedMain[roll]);
+                else
+                    pickup.SetupSecondary(unownedSec[roll - unownedMain.Count]);
+                return;
             }
-            else if (secondaryWeaponPool.Count > 0)
+
+            int totalAll = mainWeaponPool.Count + secondaryWeaponPool.Count;
+            if (totalAll > 0)
             {
-                SecondaryWeaponData chosen = secondaryWeaponPool[Random.Range(0, secondaryWeaponPool.Count)];
-                pickup.SetupSecondary(chosen);
+                int roll = Random.Range(0, totalAll);
+                if (roll < mainWeaponPool.Count)
+                    pickup.SetupMain(mainWeaponPool[roll]);
+                else
+                    pickup.SetupSecondary(secondaryWeaponPool[roll - mainWeaponPool.Count]);
             }
+        }
+
+        private List<WeaponData> GetUnownedMainList()
+        {
+            var result = new List<WeaponData>();
+            var wc = _player != null ? _player.GetComponent<WeaponController>() : null;
+            var inv = _player != null ? _player.GetComponent<InventorySystem>() : null;
+
+            foreach (var w in mainWeaponPool)
+            {
+                if (w == null) continue;
+                if (wc != null && wc.CurrentWeapon == w) continue;
+                bool inBag = false;
+                if (inv != null)
+                {
+                    foreach (var item in inv.Items)
+                        if (item.mainWeapon == w) { inBag = true; break; }
+                }
+                if (!inBag) result.Add(w);
+            }
+            return result;
+        }
+
+        private List<SecondaryWeaponData> GetUnownedSecondaryList()
+        {
+            var result = new List<SecondaryWeaponData>();
+            var sc = _player != null ? _player.GetComponent<SecondaryWeaponController>() : null;
+            var inv = _player != null ? _player.GetComponent<InventorySystem>() : null;
+
+            foreach (var s in secondaryWeaponPool)
+            {
+                if (s == null) continue;
+                if (sc != null && sc.CurrentSecondary == s) continue;
+                bool inBag = false;
+                if (inv != null)
+                {
+                    foreach (var item in inv.Items)
+                        if (item.secondaryWeapon == s) { inBag = true; break; }
+                }
+                if (!inBag) result.Add(s);
+            }
+            return result;
         }
     }
 }
