@@ -3,6 +3,8 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
@@ -672,6 +674,21 @@ namespace GungeonFPS.Editor
             scSo.FindProperty("shieldBlocker").objectReferenceValue = shieldBlocker;
             scSo.ApplyModifiedPropertiesWithoutUndo();
 
+            // Wire InventorySystem
+            var inv = playerGo.AddComponent<InventorySystem>();
+            var invSo = new SerializedObject(inv);
+            invSo.FindProperty("weaponController").objectReferenceValue = wc;
+            invSo.FindProperty("secondaryController").objectReferenceValue = sc;
+            invSo.ApplyModifiedPropertiesWithoutUndo();
+
+            // Ensure EventSystem with InputSystemUIInputModule for UI Button clicks
+            var esGo = new GameObject("EventSystem");
+            esGo.AddComponent<EventSystem>();
+            esGo.AddComponent<InputSystemUIInputModule>();
+
+            // Build Inventory UI Panel
+            BuildInventoryPanel(canvasGo.transform, hudFont, inv, wc, sc);
+
             // Wire GameHUD
             var hud = canvasGo.AddComponent<GameHUD>();
             var hudSo = new SerializedObject(hud);
@@ -684,6 +701,103 @@ namespace GungeonFPS.Editor
             hudSo.FindProperty("dashFillBar").objectReferenceValue = dashFill;
             hudSo.FindProperty("hitmarkerImage").objectReferenceValue = hitImg;
             hudSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void BuildInventoryPanel(
+            Transform canvasTransform, Font hudFont,
+            InventorySystem inv, WeaponController wc, SecondaryWeaponController sc)
+        {
+            var panelGo = new GameObject("InventoryPanel");
+            panelGo.transform.SetParent(canvasTransform, false);
+            var bg = panelGo.AddComponent<Image>();
+            bg.color = new Color(0.06f, 0.08f, 0.12f, 0.92f);
+            var pRect = bg.rectTransform;
+            pRect.anchorMin = new Vector2(0.5f, 0.5f);
+            pRect.anchorMax = new Vector2(0.5f, 0.5f);
+            pRect.sizeDelta = new Vector2(920f, 560f);
+
+            // Title
+            CreateUIText(panelGo.transform, "Title", "TACTICAL LOADOUT  [TAB TO CLOSE]", hudFont, 28,
+                new Vector2(0f, 235f), new Vector2(860f, 50f), new Color(0.25f, 0.95f, 1f), TextAnchor.MiddleCenter);
+
+            // Equipped Main & Secondary labels
+            Text eqMain = CreateUIText(panelGo.transform, "EquippedMain", "[MAIN] NONE", hudFont, 22,
+                new Vector2(-210f, 170f), new Vector2(400f, 45f), Color.white, TextAnchor.MiddleLeft);
+            Text eqSec = CreateUIText(panelGo.transform, "EquippedSec", "[SEC] NONE", hudFont, 22,
+                new Vector2(210f, 170f), new Vector2(400f, 45f), Color.white, TextAnchor.MiddleLeft);
+
+            // Backpack Header
+            Text bagHeader = CreateUIText(panelGo.transform, "BagHeader", "BACKPACK (0/6)  —  CLICK TO EQUIP / SWAP", hudFont, 20,
+                new Vector2(0f, 110f), new Vector2(860f, 40f), new Color(0.7f, 0.8f, 0.9f), TextAnchor.MiddleLeft);
+
+            var invUI = canvasTransform.gameObject.AddComponent<InventoryUI>();
+            var uiSo = new SerializedObject(invUI);
+            uiSo.FindProperty("panelRoot").objectReferenceValue = panelGo;
+            uiSo.FindProperty("inventorySystem").objectReferenceValue = inv;
+            uiSo.FindProperty("weaponController").objectReferenceValue = wc;
+            uiSo.FindProperty("secondaryController").objectReferenceValue = sc;
+            uiSo.FindProperty("equippedMainText").objectReferenceValue = eqMain;
+            uiSo.FindProperty("equippedSecText").objectReferenceValue = eqSec;
+            uiSo.FindProperty("bagHeaderText").objectReferenceValue = bagHeader;
+
+            var btnProp = uiSo.FindProperty("slotButtons");
+            var txtProp = uiSo.FindProperty("slotTexts");
+            btnProp.ClearArray();
+            txtProp.ClearArray();
+
+            // 6 Slot Buttons (3x2 Grid)
+            for (int i = 0; i < 6; i++)
+            {
+                int col = i % 3;
+                int row = i / 3;
+                float x = (col - 1) * 280f;
+                float y = 20f - row * 145f;
+
+                var slotGo = new GameObject($"Slot_{i}");
+                slotGo.transform.SetParent(panelGo.transform, false);
+                var slotImg = slotGo.AddComponent<Image>();
+                slotImg.color = new Color(0.12f, 0.15f, 0.22f, 1f);
+                var sRect = slotImg.rectTransform;
+                sRect.anchoredPosition = new Vector2(x, y);
+                sRect.sizeDelta = new Vector2(255f, 120f);
+
+                var btn = slotGo.AddComponent<Button>();
+                var colors = btn.colors;
+                colors.highlightedColor = new Color(0.22f, 0.32f, 0.44f, 1f);
+                colors.pressedColor = new Color(0.15f, 0.65f, 0.8f, 1f);
+                colors.disabledColor = new Color(0.08f, 0.1f, 0.14f, 0.7f);
+                btn.colors = colors;
+
+                Text slotTxt = CreateUIText(slotGo.transform, "Label", "— EMPTY —", hudFont, 20,
+                    Vector2.zero, new Vector2(235f, 100f), new Color(0.45f, 0.5f, 0.58f), TextAnchor.MiddleCenter);
+
+                btnProp.InsertArrayElementAtIndex(i);
+                btnProp.GetArrayElementAtIndex(i).objectReferenceValue = btn;
+                txtProp.InsertArrayElementAtIndex(i);
+                txtProp.GetArrayElementAtIndex(i).objectReferenceValue = slotTxt;
+            }
+
+            uiSo.ApplyModifiedPropertiesWithoutUndo();
+            panelGo.SetActive(false);
+        }
+
+        private static Text CreateUIText(
+            Transform parent, string name, string content, Font font, int fontSize,
+            Vector2 pos, Vector2 size, Color color, TextAnchor align)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var t = go.AddComponent<Text>();
+            t.text = content;
+            t.font = font;
+            t.fontSize = fontSize;
+            t.color = color;
+            t.alignment = align;
+            t.raycastTarget = false;
+            var r = t.rectTransform;
+            r.anchoredPosition = pos;
+            r.sizeDelta = size;
+            return t;
         }
 
         private static Transform Build3DNeonShotgun(Transform cameraTransform, out Light muzzleLight, out Material coreMat)

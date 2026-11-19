@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using GungeonFPS.Core;
+using GungeonFPS.Player;
 using GungeonFPS.UI;
 using GungeonFPS.Weapons;
 
@@ -64,45 +65,69 @@ namespace GungeonFPS.Dungeon
             float distSq = (_player.position - transform.position).sqrMagnitude;
             if (distSq <= interactRadius * interactRadius)
             {
+                bool hasBagSpace = _player.TryGetComponent<InventorySystem>(out var inv) && inv.HasSpace;
+                string actionWord = hasBagSpace ? "STORE IN BAG" : "SWAP";
                 string label = mainWeapon != null
-                    ? $"[E] EQUIP MAIN: {mainWeapon.weaponName}"
-                    : (secondaryWeapon != null ? $"[E] EQUIP SECONDARY: {secondaryWeapon.weaponName}" : "");
+                    ? $"[E] {actionWord} (MAIN): {mainWeapon.weaponName}"
+                    : (secondaryWeapon != null ? $"[E] {actionWord} (SEC): {secondaryWeapon.weaponName}" : "");
 
                 if (!string.IsNullOrEmpty(label))
                     GameHUD.Instance?.RequestInteractPrompt(label);
 
                 if (Keyboard.current.eKey.wasPressedThisFrame)
-                    TryEquip();
+                    TryPickupOrSwap(inv);
             }
         }
 
-        private void TryEquip()
+        private void TryPickupOrSwap(InventorySystem inv)
         {
-            if (mainWeapon != null && _player.TryGetComponent<WeaponController>(out var wc))
+            if (mainWeapon != null)
             {
-                WeaponData prev = wc.EquipMainWeapon(mainWeapon);
-                RetroAudio.Instance?.Play(SfxType.Pickup);
-                VfxSpawner.Instance?.SpawnBurst(transform.position, mainWeapon.projectileColor, 12, 6f, 0.15f);
-
-                if (prev != null && prev != mainWeapon)
+                if (inv != null && inv.TryAddMain(mainWeapon))
                 {
-                    SetupMain(prev);
+                    RetroAudio.Instance?.Play(SfxType.Pickup);
+                    VfxSpawner.Instance?.SpawnBurst(transform.position, mainWeapon.projectileColor, 12, 6f, 0.15f);
+                    Destroy(gameObject);
                     return;
                 }
-                Destroy(gameObject);
+
+                if (_player.TryGetComponent<WeaponController>(out var wc))
+                {
+                    WeaponData prev = wc.EquipMainWeapon(mainWeapon);
+                    RetroAudio.Instance?.Play(SfxType.Pickup);
+                    VfxSpawner.Instance?.SpawnBurst(transform.position, mainWeapon.projectileColor, 12, 6f, 0.15f);
+
+                    if (prev != null && prev != mainWeapon)
+                    {
+                        SetupMain(prev);
+                        return;
+                    }
+                    Destroy(gameObject);
+                }
             }
-            else if (secondaryWeapon != null && _player.TryGetComponent<SecondaryWeaponController>(out var sc))
+            else if (secondaryWeapon != null)
             {
-                SecondaryWeaponData prev = sc.EquipSecondary(secondaryWeapon);
-                RetroAudio.Instance?.Play(SfxType.Pickup);
-                VfxSpawner.Instance?.SpawnBurst(transform.position, secondaryWeapon.accentColor, 12, 6f, 0.15f);
-
-                if (prev != null && prev != secondaryWeapon)
+                if (inv != null && inv.TryAddSecondary(secondaryWeapon))
                 {
-                    SetupSecondary(prev);
+                    RetroAudio.Instance?.Play(SfxType.Pickup);
+                    VfxSpawner.Instance?.SpawnBurst(transform.position, secondaryWeapon.accentColor, 12, 6f, 0.15f);
+                    Destroy(gameObject);
                     return;
                 }
-                Destroy(gameObject);
+
+                if (_player.TryGetComponent<SecondaryWeaponController>(out var sc))
+                {
+                    SecondaryWeaponData prev = sc.EquipSecondary(secondaryWeapon);
+                    RetroAudio.Instance?.Play(SfxType.Pickup);
+                    VfxSpawner.Instance?.SpawnBurst(transform.position, secondaryWeapon.accentColor, 12, 6f, 0.15f);
+
+                    if (prev != null && prev != secondaryWeapon)
+                    {
+                        SetupSecondary(prev);
+                        return;
+                    }
+                    Destroy(gameObject);
+                }
             }
         }
     }

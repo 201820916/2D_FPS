@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using GungeonFPS.Core;
 using GungeonFPS.Enemies;
+using GungeonFPS.UI;
 
 namespace GungeonFPS.Player
 {
@@ -51,6 +52,7 @@ namespace GungeonFPS.Player
 
         private void Update()
         {
+            if (InventoryUI.IsOpen) return;
             if (Keyboard.current == null || Mouse.current == null) return;
 
             HandleCursorToggle();

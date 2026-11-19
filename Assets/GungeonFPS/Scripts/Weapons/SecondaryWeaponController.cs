@@ -78,6 +78,7 @@ namespace GungeonFPS.Weapons
 
         private void Update()
         {
+            if (InventoryUI.IsOpen) return;
             if (equippedSecondary == null || Mouse.current == null) return;
 
             if (_cooldownTimer > 0f)

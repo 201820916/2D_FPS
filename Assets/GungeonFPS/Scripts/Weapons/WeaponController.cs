@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using GungeonFPS.Core;
 using GungeonFPS.Player;
+using GungeonFPS.UI;
 
 namespace GungeonFPS.Weapons
 {
@@ -68,6 +69,7 @@ namespace GungeonFPS.Weapons
 
         private void Update()
         {
+            if (InventoryUI.IsOpen) return;
             if (weapons.Count == 0 || Keyboard.current == null || Mouse.current == null) return;
 
             HandleWeaponSwitch();
