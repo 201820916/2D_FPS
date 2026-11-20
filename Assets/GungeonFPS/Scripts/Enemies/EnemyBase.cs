@@ -6,7 +6,9 @@ namespace GungeonFPS.Enemies
     public enum EnemyPattern
     {
         SingleChaser,
-        SpreadTurret
+        SpreadTurret,
+        SuicideBomber,
+        SpiralCore
     }
 
     public class EnemyBase : MonoBehaviour, IDamageable
@@ -24,6 +26,8 @@ namespace GungeonFPS.Enemies
         [SerializeField] private float bulletDamage = 1f;
         [SerializeField] private int spreadCount = 5;
         [SerializeField] private float spreadArcAngle = 50f;
+        [SerializeField] private float explodeRadius = 2.6f;
+        [SerializeField] private int explodeBulletCount = 8;
 
         [Header("Visuals")]
         [SerializeField] private SpriteRenderer spriteRenderer;
@@ -34,6 +38,8 @@ namespace GungeonFPS.Enemies
         private float _hp;
         private float _fireTimer;
         private float _flashTimer;
+        private float _spiralAngle;
+        private bool _isDead;
         private Color _baseColor = Color.white;
         private Vector3 _knockbackVel;
         private Transform _player;
@@ -82,9 +88,21 @@ namespace GungeonFPS.Enemies
                 Vector3 moveDir = flatToPlayer.normalized;
                 transform.position += moveDir * (moveSpeed * dt);
             }
+            else if (pattern == EnemyPattern.SuicideBomber)
+            {
+                if (dist > 0.01f)
+                    transform.position += flatToPlayer.normalized * (moveSpeed * 1.55f * dt);
+
+                if (dist <= explodeRadius)
+                {
+                    Detonate(true);
+                    return;
+                }
+                return;
+            }
 
             _fireTimer -= dt;
-            if (_fireTimer <= 0f && dist < 30f)
+            if (_fireTimer <= 0f && dist < 32f)
             {
                 _fireTimer = fireInterval;
                 FireAtPlayer(toPlayer);
@@ -102,6 +120,18 @@ namespace GungeonFPS.Enemies
             {
                 SpawnBullet(spawnPos, aimDir);
             }
+            else if (pattern == EnemyPattern.SpiralCore)
+            {
+                int arms = Mathf.Max(2, spreadCount);
+                float armStep = 360f / arms;
+                for (int i = 0; i < arms; i++)
+                {
+                    float angle = _spiralAngle + armStep * i;
+                    Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
+                    SpawnBullet(spawnPos, dir);
+                }
+                _spiralAngle = (_spiralAngle + 18f) % 360f;
+            }
             else
             {
                 int count = Mathf.Max(1, spreadCount);
@@ -117,6 +147,34 @@ namespace GungeonFPS.Enemies
             }
         }
 
+        private void Detonate(bool hitPlayerIfClose)
+        {
+            if (_isDead) return;
+            _isDead = true;
+
+            Vector3 center = transform.position + Vector3.up * 0.9f;
+            if (hitPlayerIfClose && _player != null && _player.TryGetComponent<IDamageable>(out var playerDmg))
+            {
+                Vector3 dir = (_player.position - transform.position).normalized;
+                playerDmg.TakeDamage(bulletDamage, dir, 0f);
+            }
+
+            if (enemyBulletPrefab != null && explodeBulletCount > 0)
+            {
+                float step = 360f / explodeBulletCount;
+                for (int i = 0; i < explodeBulletCount; i++)
+                {
+                    Vector3 dir = Quaternion.Euler(0f, step * i, 0f) * Vector3.forward;
+                    SpawnBullet(center, dir);
+                }
+            }
+
+            RetroAudio.Instance?.Play(SfxType.Blank, 0.85f);
+            VfxSpawner.Instance?.SpawnBurst(center, new Color(1f, 0.65f, 0.1f), 20, 9f, 0.22f);
+            OnDied?.Invoke(this);
+            Destroy(gameObject);
+        }
+
         private void SpawnBullet(Vector3 pos, Vector3 dir)
         {
             GameObject obj = ProjectilePool.Instance != null
@@ -129,6 +187,7 @@ namespace GungeonFPS.Enemies
 
         public void TakeDamage(float amount, Vector3 hitDirection, float knockbackForce = 0f)
         {
+            if (_isDead) return;
             _hp -= amount;
 
             if (knockbackForce > 0f)
@@ -145,6 +204,13 @@ namespace GungeonFPS.Enemies
 
             if (_hp <= 0f)
             {
+                if (pattern == EnemyPattern.SuicideBomber)
+                {
+                    Detonate(false);
+                    return;
+                }
+
+                _isDead = true;
                 RetroAudio.Instance?.Play(SfxType.EnemyDie);
                 VfxSpawner.Instance?.SpawnBurst(transform.position + Vector3.up * 0.9f, new Color(1f, 0.45f, 0.15f), 14, 7.5f, 0.18f);
                 OnDied?.Invoke(this);

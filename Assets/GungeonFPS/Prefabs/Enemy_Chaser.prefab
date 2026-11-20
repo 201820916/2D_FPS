@@ -79,6 +79,8 @@ MonoBehaviour:
   bulletDamage: 1
   spreadCount: 1
   spreadArcAngle: 50
+  explodeRadius: 2.6
+  explodeBulletCount: 8
   spriteRenderer: {fileID: 2489452312271411347}
   hitFlashDuration: 0.08
 --- !u!1 &7423328295401342415

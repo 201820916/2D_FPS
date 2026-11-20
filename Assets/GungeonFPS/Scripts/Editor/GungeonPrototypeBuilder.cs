@@ -47,10 +47,13 @@ namespace GungeonFPS.Editor
             Sprite enemyBulletSp = SaveSprite("bullet_enemy.png", CreateCircleTexture(16, new Color(1f, 0.15f, 0.35f), new Color(1f, 0.85f, 0.85f)), 16);
             Sprite chaserSp = SaveSprite("enemy_drone.png", CreateNeonDroneTexture(new Color(0.14f, 0.16f, 0.22f), new Color(1f, 0.25f, 0.2f)), 16);
             Sprite spreadSp = SaveSprite("enemy_turret.png", CreateNeonTurretTexture(new Color(0.16f, 0.12f, 0.24f), new Color(1f, 0.15f, 0.65f)), 16);
+            Sprite bomberSp = SaveSprite("enemy_bomber.png", CreateNeonDroneTexture(new Color(0.22f, 0.15f, 0.08f), new Color(1f, 0.72f, 0.1f)), 16);
+            Sprite spiralSp = SaveSprite("enemy_spiral.png", CreateNeonTurretTexture(new Color(0.18f, 0.08f, 0.28f), new Color(0.95f, 0.2f, 1f)), 16);
 
             Sprite neonShotgunSp = SaveSprite("gun_neon_shotgun.png", CreateNeonShotgunTexture(), 32);
             Sprite muzzleSp = SaveSprite("muzzle_flash.png", CreateMuzzleFlashTexture(new Color(0.2f, 0.95f, 1f)), 16);
             Sprite hitmarkerSp = SaveSprite("hitmarker.png", CreateHitmarkerTexture(), 16);
+            Sprite damageIndSp = SaveSprite("damage_indicator.png", CreateDamageIndicatorTexture(), 16);
             Sprite heartSp = SaveSprite("pickup_heart.png", CreateCircleTexture(16, new Color(0.95f, 0.2f, 0.45f), new Color(1f, 0.8f, 0.85f)), 16);
             Sprite blankSp = SaveSprite("pickup_blank.png", CreateCircleTexture(16, new Color(0.2f, 0.9f, 1f), Color.white), 16);
 
@@ -147,6 +150,8 @@ namespace GungeonFPS.Editor
 
             GameObject chaserPrefab = CreateEnemyPrefab("Enemy_Chaser", chaserSp, EnemyPattern.SingleChaser, enemyBulletPrefab, 60f, 1.5f, 8.5f, 1);
             GameObject spreadPrefab = CreateEnemyPrefab("Enemy_Spread", spreadSp, EnemyPattern.SpreadTurret, enemyBulletPrefab, 90f, 2.0f, 7.5f, 5);
+            GameObject bomberPrefab = CreateEnemyPrefab("Enemy_Bomber", bomberSp, EnemyPattern.SuicideBomber, enemyBulletPrefab, 45f, 1.0f, 7.5f, 1);
+            GameObject spiralPrefab = CreateEnemyPrefab("Enemy_Spiral", spiralSp, EnemyPattern.SpiralCore, enemyBulletPrefab, 140f, 0.34f, 7.5f, 4);
 
             GameObject weaponPickupPrefab = CreateWeaponPickupPrefab();
             GameObject chestPrefab = CreateChestPrefab(
@@ -178,7 +183,7 @@ namespace GungeonFPS.Editor
             systems.AddComponent<VfxSpawner>();
 
             // Mini-Dungeon (3 Connected Rooms along +Z)
-            BuildMiniDungeon(floorTex, wallTex, chaserPrefab, spreadPrefab, chestPrefab);
+            BuildMiniDungeon(floorTex, wallTex, chaserPrefab, spreadPrefab, bomberPrefab, spiralPrefab, chestPrefab);
 
             // HUD & Player (1 Main + 1 Secondary)
             CreateHUDAndPlayer(
@@ -187,6 +192,7 @@ namespace GungeonFPS.Editor
                 neonBlade,
                 muzzleSp,
                 hitmarkerSp,
+                damageIndSp,
                 crosshairSp,
                 hudFont);
 
@@ -291,6 +297,8 @@ namespace GungeonFPS.Editor
             Texture2D wallTex,
             GameObject chaserPrefab,
             GameObject spreadPrefab,
+            GameObject bomberPrefab,
+            GameObject spiralPrefab,
             GameObject chestPrefab)
         {
             var dungeon = new GameObject("MiniDungeon");
@@ -329,8 +337,8 @@ namespace GungeonFPS.Editor
             {
                 SpawnEnemy(chaserPrefab, new Vector3(-8f, 0f, 34f), room1Go.transform),
                 SpawnEnemy(chaserPrefab, new Vector3(8f, 0f, 34f), room1Go.transform),
-                SpawnEnemy(chaserPrefab, new Vector3(-5f, 0f, 24f), room1Go.transform),
-                SpawnEnemy(spreadPrefab, new Vector3(0f, 0f, 37f), room1Go.transform)
+                SpawnEnemy(bomberPrefab, new Vector3(0f, 0f, 33f), room1Go.transform),
+                SpawnEnemy(spreadPrefab, new Vector3(0f, 0f, 38f), room1Go.transform)
             };
             AttachRoomController(room1Go, "SECTOR 01", new Vector3(26f, 4f, 26f), new[] { door1S, door1N }, r1Enemies, chestPrefab);
 
@@ -347,9 +355,9 @@ namespace GungeonFPS.Editor
 
             var r2Enemies = new List<EnemyBase>
             {
-                SpawnEnemy(chaserPrefab, new Vector3(-10f, 0f, 68f), room2Go.transform),
-                SpawnEnemy(chaserPrefab, new Vector3(10f, 0f, 68f), room2Go.transform),
-                SpawnEnemy(chaserPrefab, new Vector3(0f, 0f, 74f), room2Go.transform),
+                SpawnEnemy(bomberPrefab, new Vector3(-10f, 0f, 68f), room2Go.transform),
+                SpawnEnemy(bomberPrefab, new Vector3(10f, 0f, 68f), room2Go.transform),
+                SpawnEnemy(spiralPrefab, new Vector3(0f, 0f, 66f), room2Go.transform),
                 SpawnEnemy(spreadPrefab, new Vector3(-9f, 0f, 75f), room2Go.transform),
                 SpawnEnemy(spreadPrefab, new Vector3(9f, 0f, 75f), room2Go.transform)
             };
@@ -466,7 +474,7 @@ namespace GungeonFPS.Editor
 
         private static void CreateHUDAndPlayer(
             GameObject playerBulletPrefab, WeaponData[] weapons, SecondaryWeaponData defaultSecondary,
-            Sprite muzzleSp, Sprite hitmarkerSp, Sprite crosshairSp, Font hudFont)
+            Sprite muzzleSp, Sprite hitmarkerSp, Sprite damageIndSp, Sprite crosshairSp, Font hudFont)
         {
             var playerGo = new GameObject("Player");
             playerGo.tag = "Player";
@@ -545,6 +553,30 @@ namespace GungeonFPS.Editor
             hitImg.color = new Color(1f, 0.25f, 0.35f, 0.95f);
             hitImg.raycastTarget = false;
             hitImg.rectTransform.sizeDelta = new Vector2(36f, 36f);
+
+            // Damage Direction Indicator (rotates around screen center)
+            var dmgPivotGo = new GameObject("DamageIndicatorPivot");
+            dmgPivotGo.transform.SetParent(canvasGo.transform, false);
+            var dmgPivotRect = dmgPivotGo.AddComponent<RectTransform>();
+            dmgPivotRect.anchoredPosition = Vector2.zero;
+            dmgPivotRect.sizeDelta = new Vector2(320f, 320f);
+
+            var dmgArcGo = new GameObject("DamageIndicatorArc");
+            dmgArcGo.transform.SetParent(dmgPivotGo.transform, false);
+            var dmgArcImg = dmgArcGo.AddComponent<Image>();
+            dmgArcImg.sprite = damageIndSp;
+            dmgArcImg.color = new Color(1f, 0.15f, 0.25f, 0f);
+            dmgArcImg.raycastTarget = false;
+            var dmgArcRect = dmgArcImg.rectTransform;
+            dmgArcRect.anchoredPosition = new Vector2(0f, 145f);
+            dmgArcRect.sizeDelta = new Vector2(96f, 48f);
+
+            var dmgInd = canvasGo.AddComponent<DamageIndicatorUI>();
+            var dmgSo = new SerializedObject(dmgInd);
+            dmgSo.FindProperty("indicatorPivot").objectReferenceValue = dmgPivotRect;
+            dmgSo.FindProperty("indicatorImage").objectReferenceValue = dmgArcImg;
+            dmgSo.FindProperty("playerTransform").objectReferenceValue = camGo.transform;
+            dmgSo.ApplyModifiedPropertiesWithoutUndo();
 
             // 2D HUD Weapon (disabled when using 3D Viewmodel) + Muzzle Flash
             var weaponImgGo = new GameObject("HUDWeapon");
@@ -1297,6 +1329,23 @@ namespace GungeonFPS.Editor
                     int dy = Mathf.Abs(y - 7);
                     bool diag = Mathf.Abs(dx - dy) <= 1 && dx >= 3 && dx <= 6;
                     tex.SetPixel(x, y, diag ? Color.white : Color.clear);
+                }
+            }
+            tex.Apply();
+            return tex;
+        }
+
+        private static Texture2D CreateDamageIndicatorTexture()
+        {
+            var tex = new Texture2D(32, 16, TextureFormat.RGBA32, false);
+            for (int y = 0; y < 16; y++)
+            {
+                for (int x = 0; x < 32; x++)
+                {
+                    float dx = Mathf.Abs(x - 15.5f);
+                    // Upward pointing chevron / arc
+                    bool chevron = y >= 14 - dx * 0.75f && y <= 15 - dx * 0.45f && dx <= 14f;
+                    tex.SetPixel(x, y, chevron ? Color.white : Color.clear);
                 }
             }
             tex.Apply();

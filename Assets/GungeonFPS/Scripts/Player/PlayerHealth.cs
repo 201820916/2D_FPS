@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using GungeonFPS.Core;
+using GungeonFPS.UI;
 
 namespace GungeonFPS.Player
 {
@@ -38,6 +39,7 @@ namespace GungeonFPS.Player
 
             ScreenEffects.Instance?.AddShake(0.22f);
             ScreenEffects.Instance?.TriggerFlash(new Color(1f, 0.15f, 0.15f), 0.5f);
+            DamageIndicatorUI.Instance?.ShowDamageFrom(hitDirection);
             RetroAudio.Instance?.Play(SfxType.Hurt);
 
             if (CurrentHealth <= 0)
