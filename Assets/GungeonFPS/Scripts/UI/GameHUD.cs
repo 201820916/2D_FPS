@@ -14,6 +14,7 @@ namespace GungeonFPS.UI
         [SerializeField] private PlayerController playerController;
         [SerializeField] private WeaponController weaponController;
         [SerializeField] private SecondaryWeaponController secondaryController;
+        [SerializeField] private InventorySystem inventorySystem;
 
         [SerializeField] private Text statusText;
         [SerializeField] private Text interactPromptText;
@@ -75,6 +76,7 @@ namespace GungeonFPS.UI
             {
                 string hpStr = playerHealth != null ? $"HP: {playerHealth.CurrentHealth}/{playerHealth.MaxHealth}" : "";
                 string blankStr = playerController != null ? $"  |  BLANKS [Q]: {playerController.BlanksCount}" : "";
+                string coreStr = inventorySystem != null ? $"  |  CORE: {inventorySystem.CoreCurrency}" : "";
 
                 string roomStr = "";
                 if (RoomController.ActiveCombatRoom != null)
@@ -103,7 +105,7 @@ namespace GungeonFPS.UI
                     secStr = $"   |   [SEC / RMB] {s.weaponName} ({pct}%){state}   |   [SHIFT] DASH   |   [TAB] BAG";
                 }
 
-                statusText.text = hpStr + blankStr + roomStr + mainStr + secStr;
+                statusText.text = hpStr + blankStr + coreStr + roomStr + mainStr + secStr;
             }
         }
     }

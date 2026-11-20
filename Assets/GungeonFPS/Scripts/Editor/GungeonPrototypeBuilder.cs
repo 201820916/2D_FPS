@@ -696,6 +696,7 @@ namespace GungeonFPS.Editor
             hudSo.FindProperty("playerController").objectReferenceValue = playerCtrl;
             hudSo.FindProperty("weaponController").objectReferenceValue = wc;
             hudSo.FindProperty("secondaryController").objectReferenceValue = sc;
+            hudSo.FindProperty("inventorySystem").objectReferenceValue = inv;
             hudSo.FindProperty("statusText").objectReferenceValue = statusText;
             hudSo.FindProperty("interactPromptText").objectReferenceValue = promptText;
             hudSo.FindProperty("dashFillBar").objectReferenceValue = dashFill;
@@ -710,25 +711,27 @@ namespace GungeonFPS.Editor
             var panelGo = new GameObject("InventoryPanel");
             panelGo.transform.SetParent(canvasTransform, false);
             var bg = panelGo.AddComponent<Image>();
-            bg.color = new Color(0.06f, 0.08f, 0.12f, 0.92f);
+            bg.color = new Color(0.05f, 0.07f, 0.11f, 0.94f);
             var pRect = bg.rectTransform;
             pRect.anchorMin = new Vector2(0.5f, 0.5f);
             pRect.anchorMax = new Vector2(0.5f, 0.5f);
-            pRect.sizeDelta = new Vector2(920f, 560f);
+            pRect.sizeDelta = new Vector2(1080f, 760f);
 
-            // Title
-            CreateUIText(panelGo.transform, "Title", "TACTICAL LOADOUT  [TAB TO CLOSE]", hudFont, 28,
-                new Vector2(0f, 235f), new Vector2(860f, 50f), new Color(0.25f, 0.95f, 1f), TextAnchor.MiddleCenter);
+            // Title & Core Currency
+            CreateUIText(panelGo.transform, "Title", "TACTICAL LOADOUT  [TAB]", hudFont, 26,
+                new Vector2(-240f, 340f), new Vector2(540f, 45f), new Color(0.25f, 0.95f, 1f), TextAnchor.MiddleLeft);
+            Text coreText = CreateUIText(panelGo.transform, "CoreCurrency", "CORE: 0", hudFont, 26,
+                new Vector2(310f, 340f), new Vector2(360f, 45f), new Color(1f, 0.85f, 0.25f), TextAnchor.MiddleRight);
 
             // Equipped Main & Secondary labels
-            Text eqMain = CreateUIText(panelGo.transform, "EquippedMain", "[MAIN] NONE", hudFont, 22,
-                new Vector2(-210f, 170f), new Vector2(400f, 45f), Color.white, TextAnchor.MiddleLeft);
-            Text eqSec = CreateUIText(panelGo.transform, "EquippedSec", "[SEC] NONE", hudFont, 22,
-                new Vector2(210f, 170f), new Vector2(400f, 45f), Color.white, TextAnchor.MiddleLeft);
+            Text eqMain = CreateUIText(panelGo.transform, "EquippedMain", "[MAIN] NONE", hudFont, 20,
+                new Vector2(-250f, 290f), new Vector2(480f, 36f), Color.white, TextAnchor.MiddleLeft);
+            Text eqSec = CreateUIText(panelGo.transform, "EquippedSec", "[SEC] NONE", hudFont, 20,
+                new Vector2(250f, 290f), new Vector2(480f, 36f), Color.white, TextAnchor.MiddleLeft);
 
             // Backpack Header
-            Text bagHeader = CreateUIText(panelGo.transform, "BagHeader", "BACKPACK (0/6)  —  CLICK TO EQUIP / SWAP", hudFont, 20,
-                new Vector2(0f, 110f), new Vector2(860f, 40f), new Color(0.7f, 0.8f, 0.9f), TextAnchor.MiddleLeft);
+            Text bagHeader = CreateUIText(panelGo.transform, "BagHeader", "BACKPACK (0/6)", hudFont, 18,
+                new Vector2(0f, 248f), new Vector2(980f, 32f), new Color(0.65f, 0.78f, 0.9f), TextAnchor.MiddleLeft);
 
             var invUI = canvasTransform.gameObject.AddComponent<InventoryUI>();
             var uiSo = new SerializedObject(invUI);
@@ -736,49 +739,128 @@ namespace GungeonFPS.Editor
             uiSo.FindProperty("inventorySystem").objectReferenceValue = inv;
             uiSo.FindProperty("weaponController").objectReferenceValue = wc;
             uiSo.FindProperty("secondaryController").objectReferenceValue = sc;
+            uiSo.FindProperty("coreCurrencyText").objectReferenceValue = coreText;
             uiSo.FindProperty("equippedMainText").objectReferenceValue = eqMain;
             uiSo.FindProperty("equippedSecText").objectReferenceValue = eqSec;
             uiSo.FindProperty("bagHeaderText").objectReferenceValue = bagHeader;
 
             var btnProp = uiSo.FindProperty("slotButtons");
             var txtProp = uiSo.FindProperty("slotTexts");
+            var disProp = uiSo.FindProperty("dismantleButtons");
             btnProp.ClearArray();
             txtProp.ClearArray();
+            disProp.ClearArray();
 
-            // 6 Slot Buttons (3x2 Grid)
+            // 6 Backpack Slots (3x2 Grid) + Dismantle Button per slot
             for (int i = 0; i < 6; i++)
             {
                 int col = i % 3;
                 int row = i / 3;
-                float x = (col - 1) * 280f;
-                float y = 20f - row * 145f;
+                float x = (col - 1) * 330f;
+                float y = 175f - row * 145f;
 
-                var slotGo = new GameObject($"Slot_{i}");
-                slotGo.transform.SetParent(panelGo.transform, false);
-                var slotImg = slotGo.AddComponent<Image>();
-                slotImg.color = new Color(0.12f, 0.15f, 0.22f, 1f);
-                var sRect = slotImg.rectTransform;
-                sRect.anchoredPosition = new Vector2(x, y);
-                sRect.sizeDelta = new Vector2(255f, 120f);
+                Button equipBtn = CreateUIButton(panelGo.transform, $"Slot_{i}", new Vector2(x, y), new Vector2(305f, 84f),
+                    new Color(0.11f, 0.14f, 0.21f, 1f), new Color(0.20f, 0.30f, 0.42f, 1f));
+                Text slotTxt = CreateUIText(equipBtn.transform, "Label", "— EMPTY —", hudFont, 18,
+                    Vector2.zero, new Vector2(285f, 76f), new Color(0.45f, 0.5f, 0.58f), TextAnchor.MiddleCenter);
 
-                var btn = slotGo.AddComponent<Button>();
-                var colors = btn.colors;
-                colors.highlightedColor = new Color(0.22f, 0.32f, 0.44f, 1f);
-                colors.pressedColor = new Color(0.15f, 0.65f, 0.8f, 1f);
-                colors.disabledColor = new Color(0.08f, 0.1f, 0.14f, 0.7f);
-                btn.colors = colors;
-
-                Text slotTxt = CreateUIText(slotGo.transform, "Label", "— EMPTY —", hudFont, 20,
-                    Vector2.zero, new Vector2(235f, 100f), new Color(0.45f, 0.5f, 0.58f), TextAnchor.MiddleCenter);
+                Button disBtn = CreateUIButton(panelGo.transform, $"Dismantle_{i}", new Vector2(x, y - 62f), new Vector2(305f, 34f),
+                    new Color(0.32f, 0.12f, 0.14f, 1f), new Color(0.55f, 0.18f, 0.22f, 1f));
+                CreateUIText(disBtn.transform, "Label", "DISMANTLE (+25 CORE)", hudFont, 14,
+                    Vector2.zero, new Vector2(290f, 30f), new Color(1f, 0.85f, 0.85f), TextAnchor.MiddleCenter);
 
                 btnProp.InsertArrayElementAtIndex(i);
-                btnProp.GetArrayElementAtIndex(i).objectReferenceValue = btn;
+                btnProp.GetArrayElementAtIndex(i).objectReferenceValue = equipBtn;
                 txtProp.InsertArrayElementAtIndex(i);
                 txtProp.GetArrayElementAtIndex(i).objectReferenceValue = slotTxt;
+                disProp.InsertArrayElementAtIndex(i);
+                disProp.GetArrayElementAtIndex(i).objectReferenceValue = disBtn;
             }
+
+            // Divider line
+            var divGo = new GameObject("UpgradeDivider");
+            divGo.transform.SetParent(panelGo.transform, false);
+            var divImg = divGo.AddComponent<Image>();
+            divImg.color = new Color(0.2f, 0.7f, 0.85f, 0.45f);
+            divImg.rectTransform.anchoredPosition = new Vector2(0f, -62f);
+            divImg.rectTransform.sizeDelta = new Vector2(980f, 3f);
+
+            // 2-Branch Upgrade Frame (Skeleton)
+            Text upgradeTarget = CreateUIText(panelGo.transform, "UpgradeTarget", "UPGRADE MODULE  |  TARGET: [MAIN]", hudFont, 19,
+                new Vector2(-170f, -96f), new Vector2(640f, 36f), new Color(0.25f, 0.95f, 1f), TextAnchor.MiddleLeft);
+
+            Button selMainBtn = CreateUIButton(panelGo.transform, "SelectMainUpgrade", new Vector2(260f, -96f), new Vector2(140f, 34f),
+                new Color(0.14f, 0.22f, 0.30f, 1f), new Color(0.22f, 0.42f, 0.55f, 1f));
+            CreateUIText(selMainBtn.transform, "Label", "MAIN", hudFont, 15, Vector2.zero, new Vector2(130f, 30f), Color.white, TextAnchor.MiddleCenter);
+
+            Button selSecBtn = CreateUIButton(panelGo.transform, "SelectSecUpgrade", new Vector2(415f, -96f), new Vector2(140f, 34f),
+                new Color(0.14f, 0.22f, 0.30f, 1f), new Color(0.22f, 0.42f, 0.55f, 1f));
+            CreateUIText(selSecBtn.transform, "Label", "SECONDARY", hudFont, 15, Vector2.zero, new Vector2(130f, 30f), Color.white, TextAnchor.MiddleCenter);
+
+            // Route A Card
+            BuildUpgradeRouteCard(panelGo.transform, "RouteACard", new Vector2(-248f, -238f), hudFont,
+                new Color(0.10f, 0.16f, 0.24f, 1f), new Color(0.25f, 0.95f, 1f),
+                out Text routeATitle, out Text routeADesc, out Button routeABtn);
+
+            // Route B Card
+            BuildUpgradeRouteCard(panelGo.transform, "RouteBCard", new Vector2(248f, -238f), hudFont,
+                new Color(0.18f, 0.11f, 0.22f, 1f), new Color(1f, 0.45f, 0.85f),
+                out Text routeBTitle, out Text routeBDesc, out Button routeBBtn);
+
+            uiSo.FindProperty("selectMainUpgradeButton").objectReferenceValue = selMainBtn;
+            uiSo.FindProperty("selectSecUpgradeButton").objectReferenceValue = selSecBtn;
+            uiSo.FindProperty("upgradeTargetText").objectReferenceValue = upgradeTarget;
+            uiSo.FindProperty("routeATitleText").objectReferenceValue = routeATitle;
+            uiSo.FindProperty("routeADescText").objectReferenceValue = routeADesc;
+            uiSo.FindProperty("routeAButton").objectReferenceValue = routeABtn;
+            uiSo.FindProperty("routeBTitleText").objectReferenceValue = routeBTitle;
+            uiSo.FindProperty("routeBDescText").objectReferenceValue = routeBDesc;
+            uiSo.FindProperty("routeBButton").objectReferenceValue = routeBBtn;
 
             uiSo.ApplyModifiedPropertiesWithoutUndo();
             panelGo.SetActive(false);
+        }
+
+        private static void BuildUpgradeRouteCard(
+            Transform parent, string name, Vector2 pos, Font font, Color bgColor, Color titleColor,
+            out Text titleText, out Text descText, out Button upgradeBtn)
+        {
+            var card = new GameObject(name);
+            card.transform.SetParent(parent, false);
+            var img = card.AddComponent<Image>();
+            img.color = bgColor;
+            img.rectTransform.anchoredPosition = pos;
+            img.rectTransform.sizeDelta = new Vector2(470f, 215f);
+
+            titleText = CreateUIText(card.transform, "Title", "ROUTE — [TBD]", font, 20,
+                new Vector2(0f, 75f), new Vector2(430f, 36f), titleColor, TextAnchor.MiddleLeft);
+            descText = CreateUIText(card.transform, "Desc", "Specialization pending", font, 16,
+                new Vector2(0f, 5f), new Vector2(430f, 95f), new Color(0.82f, 0.86f, 0.92f), TextAnchor.UpperLeft);
+
+            upgradeBtn = CreateUIButton(card.transform, "UpgradeBtn", new Vector2(0f, -72f), new Vector2(430f, 40f),
+                new Color(0.18f, 0.20f, 0.26f, 1f), new Color(0.28f, 0.32f, 0.40f, 1f));
+            CreateUIText(upgradeBtn.transform, "Label", "UPGRADE LOCKED  [TBD]", font, 15,
+                Vector2.zero, new Vector2(410f, 34f), new Color(0.65f, 0.7f, 0.78f), TextAnchor.MiddleCenter);
+        }
+
+        private static Button CreateUIButton(Transform parent, string name, Vector2 pos, Vector2 size, Color normal, Color highlight)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var img = go.AddComponent<Image>();
+            img.color = normal;
+            var rect = img.rectTransform;
+            rect.anchoredPosition = pos;
+            rect.sizeDelta = size;
+
+            var btn = go.AddComponent<Button>();
+            var colors = btn.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = highlight;
+            colors.pressedColor = new Color(0.2f, 0.8f, 1f, 1f);
+            colors.disabledColor = new Color(0.4f, 0.4f, 0.45f, 0.45f);
+            btn.colors = colors;
+            return btn;
         }
 
         private static Text CreateUIText(

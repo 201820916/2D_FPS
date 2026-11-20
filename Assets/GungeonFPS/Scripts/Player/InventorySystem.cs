@@ -20,10 +20,12 @@ namespace GungeonFPS.Player
     public class InventorySystem : MonoBehaviour
     {
         [SerializeField] private int maxCapacity = 6;
+        [SerializeField] private int dismantleReward = 25;
         [SerializeField] private WeaponController weaponController;
         [SerializeField] private SecondaryWeaponController secondaryController;
 
         public int MaxCapacity => maxCapacity;
+        public int DismantleReward => dismantleReward;
         public IReadOnlyList<InventoryItem> Items => _items;
         public bool HasSpace => _items.Count < maxCapacity;
         public int CoreCurrency { get; private set; }
@@ -81,6 +83,17 @@ namespace GungeonFPS.Player
                 RetroAudio.Instance?.Play(SfxType.Pickup, 0.85f);
                 OnInventoryChanged?.Invoke();
             }
+        }
+
+        public bool DismantleSlot(int index)
+        {
+            if (index < 0 || index >= _items.Count) return false;
+
+            _items.RemoveAt(index);
+            CoreCurrency += dismantleReward;
+            RetroAudio.Instance?.Play(SfxType.Bounce, 0.9f);
+            OnInventoryChanged?.Invoke();
+            return true;
         }
 
         public void AddCurrency(int amount)
