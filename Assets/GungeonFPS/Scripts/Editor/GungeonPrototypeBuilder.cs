@@ -49,6 +49,7 @@ namespace GungeonFPS.Editor
             Sprite spreadSp = SaveSprite("enemy_turret.png", CreateNeonTurretTexture(new Color(0.16f, 0.12f, 0.24f), new Color(1f, 0.15f, 0.65f)), 16);
             Sprite bomberSp = SaveSprite("enemy_bomber.png", CreateNeonDroneTexture(new Color(0.22f, 0.15f, 0.08f), new Color(1f, 0.72f, 0.1f)), 16);
             Sprite spiralSp = SaveSprite("enemy_spiral.png", CreateNeonTurretTexture(new Color(0.18f, 0.08f, 0.28f), new Color(0.95f, 0.2f, 1f)), 16);
+            Sprite bossSp = SaveSprite("boss_overlord.png", CreateNeonTurretTexture(new Color(0.22f, 0.04f, 0.12f), new Color(1f, 0.12f, 0.35f)), 16);
 
             Sprite neonShotgunSp = SaveSprite("gun_neon_shotgun.png", CreateNeonShotgunTexture(), 32);
             Sprite muzzleSp = SaveSprite("muzzle_flash.png", CreateMuzzleFlashTexture(new Color(0.2f, 0.95f, 1f)), 16);
@@ -152,6 +153,7 @@ namespace GungeonFPS.Editor
             GameObject spreadPrefab = CreateEnemyPrefab("Enemy_Spread", spreadSp, EnemyPattern.SpreadTurret, enemyBulletPrefab, 90f, 2.0f, 7.5f, 5);
             GameObject bomberPrefab = CreateEnemyPrefab("Enemy_Bomber", bomberSp, EnemyPattern.SuicideBomber, enemyBulletPrefab, 45f, 1.0f, 7.5f, 1);
             GameObject spiralPrefab = CreateEnemyPrefab("Enemy_Spiral", spiralSp, EnemyPattern.SpiralCore, enemyBulletPrefab, 140f, 0.34f, 7.5f, 4);
+            GameObject bossPrefab = CreateBossPrefab("Boss_Overlord", bossSp, enemyBulletPrefab);
 
             GameObject weaponPickupPrefab = CreateWeaponPickupPrefab();
             GameObject chestPrefab = CreateChestPrefab(
@@ -182,8 +184,11 @@ namespace GungeonFPS.Editor
             systems.AddComponent<RetroAudio>();
             systems.AddComponent<VfxSpawner>();
 
-            // Mini-Dungeon (3 Connected Rooms along +Z)
-            BuildMiniDungeon(floorTex, wallTex, chaserPrefab, spreadPrefab, bomberPrefab, spiralPrefab, chestPrefab);
+            // Runtime Procedural Dungeon Generator
+            CreateDungeonGenerator(
+                floorTex, wallTex,
+                new[] { chaserPrefab, spreadPrefab, bomberPrefab, spiralPrefab },
+                bossPrefab, chestPrefab);
 
             // HUD & Player (1 Main + 1 Secondary)
             CreateHUDAndPlayer(
@@ -721,6 +726,12 @@ namespace GungeonFPS.Editor
             // Build Inventory UI Panel
             BuildInventoryPanel(canvasGo.transform, hudFont, inv, wc, sc);
 
+            // Build Minimap (Top-Right)
+            BuildMinimapPanel(canvasGo.transform, hudFont);
+
+            // Build Boss Health Bar & Victory Banner
+            BuildBossAndVictoryUI(canvasGo.transform, hudFont, out GameObject bossBarRoot, out Image bossBarFill, out Text bossNameText, out Text victoryText);
+
             // Wire GameHUD
             var hud = canvasGo.AddComponent<GameHUD>();
             var hudSo = new SerializedObject(hud);
@@ -733,7 +744,149 @@ namespace GungeonFPS.Editor
             hudSo.FindProperty("interactPromptText").objectReferenceValue = promptText;
             hudSo.FindProperty("dashFillBar").objectReferenceValue = dashFill;
             hudSo.FindProperty("hitmarkerImage").objectReferenceValue = hitImg;
+            hudSo.FindProperty("bossBarRoot").objectReferenceValue = bossBarRoot;
+            hudSo.FindProperty("bossBarFill").objectReferenceValue = bossBarFill;
+            hudSo.FindProperty("bossNameText").objectReferenceValue = bossNameText;
+            hudSo.FindProperty("victoryBannerText").objectReferenceValue = victoryText;
             hudSo.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void CreateDungeonGenerator(
+            Texture2D floorTex, Texture2D wallTex,
+            GameObject[] enemyPrefabs, GameObject bossPrefab, GameObject chestPrefab)
+        {
+            Shader litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+
+            Material floorMat = new Material(litShader) { mainTexture = floorTex };
+            floorMat.mainTextureScale = new Vector2(10f, 10f);
+            AssetDatabase.CreateAsset(floorMat, ArtPath + "/FloorMat.mat");
+
+            Material wallMat = new Material(litShader) { mainTexture = wallTex };
+            wallMat.mainTextureScale = new Vector2(8f, 2f);
+            AssetDatabase.CreateAsset(wallMat, ArtPath + "/WallMat.mat");
+
+            Material doorMat = new Material(litShader) { color = new Color(0.18f, 0.06f, 0.12f) };
+            doorMat.EnableKeyword("_EMISSION");
+            doorMat.SetColor("_EmissionColor", new Color(1f, 0.15f, 0.35f) * 1.8f);
+            AssetDatabase.CreateAsset(doorMat, ArtPath + "/DoorMat.mat");
+
+            var dgGo = new GameObject("DungeonGenerator");
+            var dg = dgGo.AddComponent<DungeonGenerator>();
+            var so = new SerializedObject(dg);
+            so.FindProperty("totalRooms").intValue = 6;
+            so.FindProperty("floorMat").objectReferenceValue = floorMat;
+            so.FindProperty("wallMat").objectReferenceValue = wallMat;
+            so.FindProperty("doorMat").objectReferenceValue = doorMat;
+            so.FindProperty("bossPrefab").objectReferenceValue = bossPrefab;
+            so.FindProperty("chestPrefab").objectReferenceValue = chestPrefab;
+
+            var listProp = so.FindProperty("enemyPrefabs");
+            listProp.ClearArray();
+            for (int i = 0; i < enemyPrefabs.Length; i++)
+            {
+                listProp.InsertArrayElementAtIndex(i);
+                listProp.GetArrayElementAtIndex(i).objectReferenceValue = enemyPrefabs[i];
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static GameObject CreateBossPrefab(string name, Sprite sprite, GameObject bulletPrefab)
+        {
+            var go = new GameObject(name);
+            go.tag = "Enemy";
+
+            var col = go.AddComponent<CapsuleCollider>();
+            col.center = new Vector3(0f, 1.4f, 0f);
+            col.height = 2.8f;
+            col.radius = 0.9f;
+
+            var vis = new GameObject("Visual");
+            vis.transform.SetParent(go.transform);
+            vis.transform.localPosition = new Vector3(0f, 1.45f, 0f);
+            vis.transform.localScale = Vector3.one * 2.4f;
+            var sr = vis.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            vis.AddComponent<BillboardSprite>();
+
+            var boss = go.AddComponent<BossController>();
+            var so = new SerializedObject(boss);
+            so.FindProperty("enemyBulletPrefab").objectReferenceValue = bulletPrefab;
+            so.FindProperty("spriteRenderer").objectReferenceValue = sr;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            string path = $"{PrefabPath}/{name}.prefab";
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
+            Object.DestroyImmediate(go);
+            return prefab;
+        }
+
+        private static void BuildMinimapPanel(Transform canvasTransform, Font hudFont)
+        {
+            var panel = new GameObject("MinimapPanel");
+            panel.transform.SetParent(canvasTransform, false);
+            var bg = panel.AddComponent<Image>();
+            bg.color = new Color(0.05f, 0.07f, 0.11f, 0.72f);
+            bg.raycastTarget = false;
+            var rect = bg.rectTransform;
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = new Vector2(-24f, -24f);
+            rect.sizeDelta = new Vector2(210f, 210f);
+
+            CreateUIText(panel.transform, "MapTitle", "MAP  [F5 NEW]", hudFont, 13,
+                new Vector2(0f, 88f), new Vector2(190f, 24f), new Color(0.65f, 0.8f, 0.95f), TextAnchor.MiddleCenter);
+
+            var container = new GameObject("Cells");
+            container.transform.SetParent(panel.transform, false);
+            var cRect = container.AddComponent<RectTransform>();
+            cRect.anchoredPosition = new Vector2(0f, -10f);
+            cRect.sizeDelta = new Vector2(180f, 170f);
+
+            var mm = canvasTransform.gameObject.AddComponent<MinimapUI>();
+            var so = new SerializedObject(mm);
+            so.FindProperty("mapContainer").objectReferenceValue = cRect;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void BuildBossAndVictoryUI(
+            Transform canvasTransform, Font hudFont,
+            out GameObject bossBarRoot, out Image bossBarFill, out Text bossNameText, out Text victoryText)
+        {
+            bossBarRoot = new GameObject("BossHealthBar");
+            bossBarRoot.transform.SetParent(canvasTransform, false);
+            var bg = bossBarRoot.AddComponent<Image>();
+            bg.color = new Color(0.06f, 0.04f, 0.08f, 0.85f);
+            bg.raycastTarget = false;
+            var bRect = bg.rectTransform;
+            bRect.anchorMin = new Vector2(0.5f, 1f);
+            bRect.anchorMax = new Vector2(0.5f, 1f);
+            bRect.pivot = new Vector2(0.5f, 1f);
+            bRect.anchoredPosition = new Vector2(0f, -28f);
+            bRect.sizeDelta = new Vector2(560f, 26f);
+
+            var fillGo = new GameObject("Fill");
+            fillGo.transform.SetParent(bossBarRoot.transform, false);
+            bossBarFill = fillGo.AddComponent<Image>();
+            bossBarFill.color = new Color(1f, 0.15f, 0.35f, 1f);
+            bossBarFill.type = Image.Type.Filled;
+            bossBarFill.fillMethod = Image.FillMethod.Horizontal;
+            bossBarFill.raycastTarget = false;
+            var fRect = bossBarFill.rectTransform;
+            fRect.anchorMin = Vector2.zero;
+            fRect.anchorMax = Vector2.one;
+            fRect.offsetMin = new Vector2(3f, 3f);
+            fRect.offsetMax = new Vector2(-3f, -3f);
+
+            bossNameText = CreateUIText(bossBarRoot.transform, "BossName", "OMEGA CORE MK-I", hudFont, 18,
+                new Vector2(0f, -28f), new Vector2(560f, 28f), new Color(1f, 0.85f, 0.9f), TextAnchor.MiddleCenter);
+            bossBarRoot.SetActive(false);
+
+            victoryText = CreateUIText(canvasTransform, "VictoryBanner", "", hudFont, 34,
+                new Vector2(0f, 180f), new Vector2(1000f, 120f), new Color(0.25f, 0.95f, 1f), TextAnchor.MiddleCenter);
+            var vOutline = victoryText.gameObject.AddComponent<Outline>();
+            vOutline.effectColor = Color.black;
+            vOutline.effectDistance = new Vector2(2f, -2f);
         }
 
         private static void BuildInventoryPanel(

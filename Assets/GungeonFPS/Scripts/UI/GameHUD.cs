@@ -1,6 +1,9 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using GungeonFPS.Dungeon;
+using GungeonFPS.Enemies;
 using GungeonFPS.Player;
 using GungeonFPS.Weapons;
 
@@ -21,6 +24,12 @@ namespace GungeonFPS.UI
         [SerializeField] private Image dashFillBar;
         [SerializeField] private Image hitmarkerImage;
 
+        [Header("Boss & Floor Clear UI")]
+        [SerializeField] private GameObject bossBarRoot;
+        [SerializeField] private Image bossBarFill;
+        [SerializeField] private Text bossNameText;
+        [SerializeField] private Text victoryBannerText;
+
         private float _hitmarkerTimer;
         private string _pendingPrompt;
 
@@ -37,6 +46,16 @@ namespace GungeonFPS.UI
                 hitmarkerImage.enabled = false;
             if (interactPromptText != null)
                 interactPromptText.text = "";
+            if (bossBarRoot != null)
+                bossBarRoot.SetActive(false);
+            if (victoryBannerText != null)
+                victoryBannerText.text = "";
+        }
+
+        public void ShowFloorCleared()
+        {
+            if (victoryBannerText != null)
+                victoryBannerText.text = "FLOOR 1 CLEARED!\nPRESS [F5] FOR NEW RANDOM DUNGEON";
         }
 
         public void TriggerHitmarker()
@@ -62,6 +81,27 @@ namespace GungeonFPS.UI
 
         private void Update()
         {
+            if (Keyboard.current != null && Keyboard.current.f5Key.wasPressedThisFrame)
+            {
+                Time.timeScale = 1f;
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                return;
+            }
+
+            if (bossBarRoot != null)
+            {
+                var boss = BossController.ActiveBoss;
+                bool showBoss = boss != null;
+                if (bossBarRoot.activeSelf != showBoss)
+                    bossBarRoot.SetActive(showBoss);
+
+                if (showBoss)
+                {
+                    if (bossBarFill != null) bossBarFill.fillAmount = boss.HealthNormalized;
+                    if (bossNameText != null) bossNameText.text = boss.IsPhaseTwo ? $"{boss.BossName} [OVERDRIVE]" : boss.BossName;
+                }
+            }
+
             if (_hitmarkerTimer > 0f)
             {
                 _hitmarkerTimer -= Time.deltaTime;
