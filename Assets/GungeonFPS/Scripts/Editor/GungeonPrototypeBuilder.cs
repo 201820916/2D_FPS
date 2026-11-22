@@ -160,6 +160,7 @@ namespace GungeonFPS.Editor
                 weaponPickupPrefab,
                 new[] { ricochetRifle, hyperSmg, neonShotgun },
                 new[] { aegisShield, neonBlade });
+            GameObject portalPrefab = CreatePortalPrefab();
 
             // 5. Build Scene
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -188,7 +189,7 @@ namespace GungeonFPS.Editor
             CreateDungeonGenerator(
                 floorTex, wallTex,
                 new[] { chaserPrefab, spreadPrefab, bomberPrefab, spiralPrefab },
-                bossPrefab, chestPrefab);
+                bossPrefab, chestPrefab, portalPrefab);
 
             // HUD & Player (1 Main + 1 Secondary)
             CreateHUDAndPlayer(
@@ -732,6 +733,9 @@ namespace GungeonFPS.Editor
             // Build Boss Health Bar & Victory Banner
             BuildBossAndVictoryUI(canvasGo.transform, hudFont, out GameObject bossBarRoot, out Image bossBarFill, out Text bossNameText, out Text victoryText);
 
+            // Build Game Over Panel
+            BuildGameOverPanel(canvasGo.transform, hudFont, inv);
+
             // Wire GameHUD
             var hud = canvasGo.AddComponent<GameHUD>();
             var hudSo = new SerializedObject(hud);
@@ -753,7 +757,7 @@ namespace GungeonFPS.Editor
 
         private static void CreateDungeonGenerator(
             Texture2D floorTex, Texture2D wallTex,
-            GameObject[] enemyPrefabs, GameObject bossPrefab, GameObject chestPrefab)
+            GameObject[] enemyPrefabs, GameObject bossPrefab, GameObject chestPrefab, GameObject portalPrefab)
         {
             Shader litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
 
@@ -779,6 +783,7 @@ namespace GungeonFPS.Editor
             so.FindProperty("doorMat").objectReferenceValue = doorMat;
             so.FindProperty("bossPrefab").objectReferenceValue = bossPrefab;
             so.FindProperty("chestPrefab").objectReferenceValue = chestPrefab;
+            so.FindProperty("portalPrefab").objectReferenceValue = portalPrefab;
 
             var listProp = so.FindProperty("enemyPrefabs");
             listProp.ClearArray();
@@ -887,6 +892,81 @@ namespace GungeonFPS.Editor
             var vOutline = victoryText.gameObject.AddComponent<Outline>();
             vOutline.effectColor = Color.black;
             vOutline.effectDistance = new Vector2(2f, -2f);
+        }
+
+        private static GameObject CreatePortalPrefab()
+        {
+            var go = new GameObject("FloorPortal");
+            Shader litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+
+            Material baseMat = new Material(litShader) { color = new Color(0.12f, 0.14f, 0.2f) };
+            AssetDatabase.CreateAsset(baseMat, ArtPath + "/PortalBaseMat.mat");
+
+            Material glowMat = new Material(litShader) { color = new Color(0.25f, 0.95f, 1f) };
+            glowMat.EnableKeyword("_EMISSION");
+            glowMat.SetColor("_EmissionColor", new Color(0.25f, 0.95f, 1f) * 2.5f);
+            AssetDatabase.CreateAsset(glowMat, ArtPath + "/PortalGlowMat.mat");
+
+            var pad = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            pad.name = "Pad";
+            Object.DestroyImmediate(pad.GetComponent<Collider>());
+            pad.transform.SetParent(go.transform);
+            pad.transform.localPosition = new Vector3(0f, 0.1f, 0f);
+            pad.transform.localScale = new Vector3(2.4f, 0.1f, 2.4f);
+            pad.GetComponent<Renderer>().sharedMaterial = baseMat;
+
+            var ring = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            ring.name = "PortalCore";
+            Object.DestroyImmediate(ring.GetComponent<Collider>());
+            ring.transform.SetParent(go.transform);
+            ring.transform.localPosition = new Vector3(0f, 1.5f, 0f);
+            ring.transform.localRotation = Quaternion.Euler(45f, 45f, 0f);
+            ring.transform.localScale = new Vector3(0.95f, 0.95f, 0.95f);
+            ring.GetComponent<Renderer>().sharedMaterial = glowMat;
+
+            var portal = go.AddComponent<FloorPortal>();
+            var so = new SerializedObject(portal);
+            so.FindProperty("visualRing").objectReferenceValue = ring.transform;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            string path = $"{PrefabPath}/FloorPortal.prefab";
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
+            Object.DestroyImmediate(go);
+            return prefab;
+        }
+
+        private static void BuildGameOverPanel(Transform canvasTransform, Font hudFont, InventorySystem inv)
+        {
+            var panelGo = new GameObject("GameOverPanel");
+            panelGo.transform.SetParent(canvasTransform, false);
+            var bg = panelGo.AddComponent<Image>();
+            bg.color = new Color(0.06f, 0.02f, 0.04f, 0.92f);
+            var rect = bg.rectTransform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            CreateUIText(panelGo.transform, "GameOverTitle", "SYSTEM TERMINATED", hudFont, 54,
+                new Vector2(0f, 130f), new Vector2(900f, 80f), new Color(1f, 0.2f, 0.35f), TextAnchor.MiddleCenter);
+
+            Text statsText = CreateUIText(panelGo.transform, "RunStats", "FLOOR REACHED: 1", hudFont, 26,
+                new Vector2(0f, 10f), new Vector2(700f, 140f), new Color(0.9f, 0.94f, 1f), TextAnchor.MiddleCenter);
+
+            Button retryBtn = CreateUIButton(panelGo.transform, "RetryButton", new Vector2(0f, -120f), new Vector2(360f, 64f),
+                new Color(0.14f, 0.28f, 0.36f, 1f), new Color(0.22f, 0.55f, 0.68f, 1f));
+            CreateUIText(retryBtn.transform, "Label", "RETRY  —  FLOOR 1", hudFont, 22,
+                Vector2.zero, new Vector2(340f, 54f), Color.white, TextAnchor.MiddleCenter);
+
+            var goUI = canvasTransform.gameObject.AddComponent<GameOverUI>();
+            var so = new SerializedObject(goUI);
+            so.FindProperty("panelRoot").objectReferenceValue = panelGo;
+            so.FindProperty("statsText").objectReferenceValue = statsText;
+            so.FindProperty("retryButton").objectReferenceValue = retryBtn;
+            so.FindProperty("inventorySystem").objectReferenceValue = inv;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            panelGo.SetActive(false);
         }
 
         private static void BuildInventoryPanel(

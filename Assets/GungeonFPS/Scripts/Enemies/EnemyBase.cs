@@ -46,7 +46,7 @@ namespace GungeonFPS.Enemies
 
         private void Awake()
         {
-            _hp = maxHealth;
+            _hp = maxHealth * RunManager.EnemyHealthMultiplier;
             _fireTimer = Random.Range(0.4f, fireInterval);
             if (spriteRenderer == null)
                 spriteRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -73,8 +73,10 @@ namespace GungeonFPS.Enemies
 
             if (_knockbackVel.sqrMagnitude > 0.01f)
             {
-                transform.position += _knockbackVel * dt;
-                _knockbackVel = Vector3.Lerp(_knockbackVel, Vector3.zero, dt * 10f);
+                if (!MoveSafe(_knockbackVel * dt))
+                    _knockbackVel = Vector3.zero;
+                else
+                    _knockbackVel = Vector3.Lerp(_knockbackVel, Vector3.zero, dt * 10f);
             }
 
             if (_player == null) return;
@@ -86,12 +88,12 @@ namespace GungeonFPS.Enemies
             if (pattern == EnemyPattern.SingleChaser && dist > preferredRange)
             {
                 Vector3 moveDir = flatToPlayer.normalized;
-                transform.position += moveDir * (moveSpeed * dt);
+                MoveSafe(moveDir * (moveSpeed * dt));
             }
             else if (pattern == EnemyPattern.SuicideBomber)
             {
                 if (dist > 0.01f)
-                    transform.position += flatToPlayer.normalized * (moveSpeed * 1.55f * dt);
+                    MoveSafe(flatToPlayer.normalized * (moveSpeed * 1.55f * dt));
 
                 if (dist <= explodeRadius)
                 {
@@ -107,6 +109,62 @@ namespace GungeonFPS.Enemies
                 _fireTimer = fireInterval;
                 FireAtPlayer(toPlayer);
             }
+        }
+
+        private bool MoveSafe(Vector3 delta)
+        {
+            delta.y = 0f;
+            float dist = delta.magnitude;
+            if (dist < 0.0001f) return true;
+
+            Vector3 dir = delta / dist;
+            Vector3 origin = transform.position + Vector3.up * 0.9f;
+            const float radius = 0.55f;
+
+            var hits = Physics.SphereCastAll(origin, radius, dir, dist + 0.08f, ~0, QueryTriggerInteraction.Ignore);
+            bool blocked = false;
+            RaycastHit closest = default;
+            float minDist = float.MaxValue;
+
+            foreach (var h in hits)
+            {
+                if (h.collider.gameObject == gameObject) continue;
+                if (h.collider.CompareTag("Enemy") || h.collider.CompareTag("Player")) continue;
+                if (h.distance < minDist)
+                {
+                    minDist = h.distance;
+                    closest = h;
+                    blocked = true;
+                }
+            }
+
+            if (!blocked)
+            {
+                transform.position += delta;
+                return true;
+            }
+
+            // Slide along wall plane if clear
+            Vector3 slide = Vector3.ProjectOnPlane(delta, closest.normal);
+            slide.y = 0f;
+            float slideDist = slide.magnitude;
+            if (slideDist > 0.001f)
+            {
+                Vector3 slideDir = slide / slideDist;
+                bool slideBlocked = false;
+                var slideHits = Physics.SphereCastAll(origin, radius, slideDir, slideDist + 0.08f, ~0, QueryTriggerInteraction.Ignore);
+                foreach (var sh in slideHits)
+                {
+                    if (sh.collider.gameObject == gameObject) continue;
+                    if (sh.collider.CompareTag("Enemy") || sh.collider.CompareTag("Player")) continue;
+                    slideBlocked = true;
+                    break;
+                }
+                if (!slideBlocked)
+                    transform.position += slide;
+            }
+
+            return false;
         }
 
         private void FireAtPlayer(Vector3 toPlayer)
@@ -171,6 +229,7 @@ namespace GungeonFPS.Enemies
 
             RetroAudio.Instance?.Play(SfxType.Blank, 0.85f);
             VfxSpawner.Instance?.SpawnBurst(center, new Color(1f, 0.65f, 0.1f), 20, 9f, 0.22f);
+            RunManager.RegisterKill();
             OnDied?.Invoke(this);
             Destroy(gameObject);
         }
@@ -213,6 +272,7 @@ namespace GungeonFPS.Enemies
                 _isDead = true;
                 RetroAudio.Instance?.Play(SfxType.EnemyDie);
                 VfxSpawner.Instance?.SpawnBurst(transform.position + Vector3.up * 0.9f, new Color(1f, 0.45f, 0.15f), 14, 7.5f, 0.18f);
+                RunManager.RegisterKill();
                 OnDied?.Invoke(this);
                 Destroy(gameObject);
             }

@@ -88,6 +88,7 @@ namespace GungeonFPS.UI
 
         private void Update()
         {
+            if (GameOverUI.IsOpen) return;
             if (Keyboard.current == null) return;
 
             if (Keyboard.current.tabKey.wasPressedThisFrame)

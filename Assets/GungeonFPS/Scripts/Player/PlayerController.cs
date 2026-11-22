@@ -58,8 +58,8 @@ namespace GungeonFPS.Player
 
         private void Update()
         {
-            // 인벤토리 UI가 열려 있을 때는 플레이어 조작을 완전히 멈춤
-            if (InventoryUI.IsOpen) return;
+            // 인벤토리 또는 게임오버 UI가 열려 있을 때는 플레이어 조작을 완전히 멈춤
+            if (InventoryUI.IsOpen || GameOverUI.IsOpen) return;
             if (Keyboard.current == null || Mouse.current == null) return;
 
             HandleCursorToggle();
@@ -173,6 +173,11 @@ namespace GungeonFPS.Player
         public void AddBlank(int amount)
         {
             BlanksCount += Mathf.Max(0, amount);
+        }
+
+        public void SetBlanks(int count)
+        {
+            BlanksCount = Mathf.Max(0, count);
         }
 
         /// <summary>

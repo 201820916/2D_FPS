@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using GungeonFPS.Core;
 using GungeonFPS.Dungeon;
 using GungeonFPS.Enemies;
 using GungeonFPS.Player;
@@ -50,12 +51,22 @@ namespace GungeonFPS.UI
                 bossBarRoot.SetActive(false);
             if (victoryBannerText != null)
                 victoryBannerText.text = "";
+
+            EnsureFilledSprite(bossBarFill);
+            EnsureFilledSprite(dashFillBar);
+        }
+
+        private static void EnsureFilledSprite(Image img)
+        {
+            if (img == null || img.sprite != null) return;
+            var tex = Texture2D.whiteTexture;
+            img.sprite = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f));
         }
 
         public void ShowFloorCleared()
         {
             if (victoryBannerText != null)
-                victoryBannerText.text = "FLOOR 1 CLEARED!\nPRESS [F5] FOR NEW RANDOM DUNGEON";
+                victoryBannerText.text = $"FLOOR {RunManager.CurrentFloor} CLEARED!\nENTER THE PORTAL FOR FLOOR {RunManager.CurrentFloor + 1}";
         }
 
         public void TriggerHitmarker()
@@ -84,6 +95,7 @@ namespace GungeonFPS.UI
             if (Keyboard.current != null && Keyboard.current.f5Key.wasPressedThisFrame)
             {
                 Time.timeScale = 1f;
+                RunManager.ResetRun();
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
                 return;
             }
@@ -114,6 +126,7 @@ namespace GungeonFPS.UI
 
             if (statusText != null)
             {
+                string floorStr = $"FLOOR {RunManager.CurrentFloor}  |  ";
                 string hpStr = playerHealth != null ? $"HP: {playerHealth.CurrentHealth}/{playerHealth.MaxHealth}" : "";
                 string blankStr = playerController != null ? $"  |  BLANKS [Q]: {playerController.BlanksCount}" : "";
                 string coreStr = inventorySystem != null ? $"  |  CORE: {inventorySystem.CoreCurrency}" : "";
@@ -145,7 +158,7 @@ namespace GungeonFPS.UI
                     secStr = $"   |   [SEC / RMB] {s.weaponName} ({pct}%){state}   |   [SHIFT] DASH   |   [TAB] BAG";
                 }
 
-                statusText.text = hpStr + blankStr + coreStr + roomStr + mainStr + secStr;
+                statusText.text = floorStr + hpStr + blankStr + coreStr + roomStr + mainStr + secStr;
             }
         }
     }

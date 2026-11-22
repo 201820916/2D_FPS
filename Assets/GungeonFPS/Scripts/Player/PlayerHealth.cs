@@ -44,9 +44,21 @@ namespace GungeonFPS.Player
 
             if (CurrentHealth <= 0)
             {
-                // Quick prototype reset: reload current scene
-                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                if (GameOverUI.Instance != null)
+                {
+                    GameOverUI.Instance.ShowGameOver();
+                }
+                else
+                {
+                    RunManager.ResetRun();
+                    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                }
             }
+        }
+
+        public void SetHealth(int value)
+        {
+            CurrentHealth = Mathf.Clamp(value, 1, maxHealth);
         }
 
         public void Heal(int amount)

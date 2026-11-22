@@ -34,6 +34,7 @@ namespace GungeonFPS.Enemies
 
         private void Awake()
         {
+            maxHealth *= RunManager.EnemyHealthMultiplier;
             _hp = maxHealth;
             if (spriteRenderer == null)
                 spriteRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -174,6 +175,7 @@ namespace GungeonFPS.Enemies
                 RetroAudio.Instance?.Play(SfxType.Blank, 1.2f);
                 VfxSpawner.Instance?.SpawnBurst(transform.position + Vector3.up * 1.2f, new Color(1f, 0.2f, 0.65f), 32, 12f, 0.28f);
                 ScreenEffects.Instance?.AddShake(0.35f);
+                RunManager.RegisterKill();
                 OnDied?.Invoke(this);
                 Destroy(gameObject);
             }

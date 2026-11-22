@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using GungeonFPS.Core;
 using GungeonFPS.Enemies;
 using GungeonFPS.UI;
 
@@ -40,6 +41,7 @@ namespace GungeonFPS.Dungeon
         [SerializeField] private List<GameObject> enemyPrefabs = new();
         [SerializeField] private GameObject bossPrefab;
         [SerializeField] private GameObject chestPrefab;
+        [SerializeField] private GameObject portalPrefab;
 
         public IReadOnlyDictionary<Vector2Int, GeneratedRoomInfo> Rooms => _rooms;
         public event Action OnDungeonGenerated;
@@ -59,6 +61,10 @@ namespace GungeonFPS.Dungeon
 
         private void Start()
         {
+            GameObject p = GameObject.FindGameObjectWithTag("Player");
+            if (p != null)
+                RunManager.RestoreCarriedState(p);
+
             GenerateDungeon();
         }
 
@@ -72,7 +78,7 @@ namespace GungeonFPS.Dungeon
         public void GenerateDungeon()
         {
             _rooms.Clear();
-            var coords = BuildRandomGraph(Mathf.Max(4, totalRooms));
+            var coords = BuildRandomGraph(Mathf.Max(4, totalRooms + RunManager.ExtraRooms));
 
             // Determine Boss room (farthest Manhattan distance from 0,0)
             Vector2Int bossPos = coords[coords.Count - 1];
@@ -228,8 +234,13 @@ namespace GungeonFPS.Dungeon
                     var bGo = Instantiate(bossPrefab, center, Quaternion.identity, roomGo.transform);
                     spawnedBoss = bGo.GetComponent<BossController>();
                 }
-                rc.InitializeRuntime("BOSS CHAMBER", doors, null, spawnedBoss, chestPrefab);
-                rc.OnRoomCleared += _ => GameHUD.Instance?.ShowFloorCleared();
+                rc.InitializeRuntime($"FLOOR {RunManager.CurrentFloor} BOSS", doors, null, spawnedBoss, null);
+                rc.OnRoomCleared += _ =>
+                {
+                    if (portalPrefab != null)
+                        Instantiate(portalPrefab, center, Quaternion.identity);
+                    GameHUD.Instance?.ShowFloorCleared();
+                };
             }
             else
             {

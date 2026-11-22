@@ -69,7 +69,7 @@ namespace GungeonFPS.Weapons
 
         private void Update()
         {
-            if (InventoryUI.IsOpen) return;
+            if (InventoryUI.IsOpen || GameOverUI.IsOpen) return;
             if (weapons.Count == 0 || Keyboard.current == null || Mouse.current == null) return;
 
             HandleWeaponSwitch();
