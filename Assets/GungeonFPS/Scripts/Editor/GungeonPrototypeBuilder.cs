@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
+using UnityEditor.AddressableAssets;
+using UnityEditor.AddressableAssets.Settings;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -58,11 +60,20 @@ namespace GungeonFPS.Editor
             Sprite heartSp = SaveSprite("pickup_heart.png", CreateCircleTexture(16, new Color(0.95f, 0.2f, 0.45f), new Color(1f, 0.8f, 0.85f)), 16);
             Sprite blankSp = SaveSprite("pickup_blank.png", CreateCircleTexture(16, new Color(0.2f, 0.9f, 1f), Color.white), 16);
 
-            // 3. Main Weapons (1 equipped by default + 2 chest loot weapons)
+            // 3. Main Weapons (1 equipped by default + 2 chest loot weapons) with Kenney Blaster Kit 3D Viewmodels (Addressables)
+            GameObject vmShotgun = CreateWeaponViewmodelPrefab("VM_NeonShotgun", "blaster-d.fbx", "Weapons/VM_NeonShotgun");
+            GameObject vmRicochet = CreateWeaponViewmodelPrefab("VM_RicochetRifle", "blaster-h.fbx", "Weapons/VM_RicochetRifle");
+            GameObject vmSmg = CreateWeaponViewmodelPrefab("VM_HyperSMG", "blaster-b.fbx", "Weapons/VM_HyperSMG");
+
             WeaponData neonShotgun = CreateOrUpdateWeapon("Weapon_NeonShotgun", w =>
             {
                 w.weaponName = "PULSAR-8 SHOTGUN";
                 w.hudSprite = neonShotgunSp;
+                w.viewmodelPrefab = vmShotgun;
+                w.viewmodelAddress = "Weapons/VM_NeonShotgun";
+                w.viewmodelOffset = Vector3.zero;
+                w.viewmodelEuler = new Vector3(0f, 180f, 0f);
+                w.viewmodelScale = 0.55f;
                 w.projectileColor = new Color(0.25f, 0.95f, 1f);
                 w.fireRate = 2.1f;
                 w.pelletsPerShot = 8;
@@ -84,6 +95,11 @@ namespace GungeonFPS.Editor
             {
                 w.weaponName = "RICOCHET RIFLE";
                 w.hudSprite = neonShotgunSp;
+                w.viewmodelPrefab = vmRicochet;
+                w.viewmodelAddress = "Weapons/VM_RicochetRifle";
+                w.viewmodelOffset = Vector3.zero;
+                w.viewmodelEuler = new Vector3(0f, 180f, 0f);
+                w.viewmodelScale = 0.55f;
                 w.projectileColor = new Color(0.2f, 1f, 0.55f);
                 w.fireRate = 4.5f;
                 w.pelletsPerShot = 1;
@@ -105,6 +121,11 @@ namespace GungeonFPS.Editor
             {
                 w.weaponName = "HYPER PULSE SMG";
                 w.hudSprite = neonShotgunSp;
+                w.viewmodelPrefab = vmSmg;
+                w.viewmodelAddress = "Weapons/VM_HyperSMG";
+                w.viewmodelOffset = Vector3.zero;
+                w.viewmodelEuler = new Vector3(0f, 180f, 0f);
+                w.viewmodelScale = 0.55f;
                 w.projectileColor = new Color(1f, 0.3f, 0.75f);
                 w.fireRate = 11.5f;
                 w.pelletsPerShot = 1;
@@ -892,6 +913,49 @@ namespace GungeonFPS.Editor
             var vOutline = victoryText.gameObject.AddComponent<Outline>();
             vOutline.effectColor = Color.black;
             vOutline.effectDistance = new Vector2(2f, -2f);
+        }
+
+        private static GameObject CreateWeaponViewmodelPrefab(string prefabName, string fbxFileName, string address)
+        {
+            string vmFolder = PrefabPath + "/Viewmodels";
+            if (!Directory.Exists(vmFolder)) Directory.CreateDirectory(vmFolder);
+
+            string fbxPath = $"{ExternalPath}/kenney_blaster-kit_2.1/Models/FBX format/{fbxFileName}";
+            GameObject fbxAsset = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath);
+            if (fbxAsset == null)
+            {
+                Debug.LogWarning($"[GungeonPrototypeBuilder] FBX not found: {fbxPath}");
+                return null;
+            }
+
+            var root = new GameObject(prefabName);
+            var model = (GameObject)PrefabUtility.InstantiatePrefab(fbxAsset, root.transform);
+            model.transform.localPosition = Vector3.zero;
+            model.transform.localRotation = Quaternion.identity;
+            model.transform.localScale = Vector3.one;
+
+            foreach (var col in root.GetComponentsInChildren<Collider>())
+                Object.DestroyImmediate(col);
+
+            string outPath = $"{vmFolder}/{prefabName}.prefab";
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, outPath);
+            Object.DestroyImmediate(root);
+
+            RegisterAddressable(outPath, address);
+            return prefab;
+        }
+
+        private static void RegisterAddressable(string assetPath, string address)
+        {
+            var settings = AddressableAssetSettingsDefaultObject.GetSettings(true);
+            if (settings == null || settings.DefaultGroup == null) return;
+
+            string guid = AssetDatabase.AssetPathToGUID(assetPath);
+            if (string.IsNullOrEmpty(guid)) return;
+
+            var entry = settings.CreateOrMoveEntry(guid, settings.DefaultGroup, false, false);
+            entry.address = address;
+            settings.SetDirty(AddressableAssetSettings.ModificationEvent.EntryMoved, entry, true);
         }
 
         private static GameObject CreatePortalPrefab()

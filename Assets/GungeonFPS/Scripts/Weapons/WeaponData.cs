@@ -10,6 +10,13 @@ namespace GungeonFPS.Weapons
         public Sprite hudSprite;
         public Color projectileColor = new Color(1f, 0.9f, 0.3f, 1f);
 
+        [Header("3D Viewmodel")]
+        public GameObject viewmodelPrefab;
+        public string viewmodelAddress; // Addressables key placeholder (install com.unity.addressables to use)
+        public Vector3 viewmodelOffset = Vector3.zero;
+        public Vector3 viewmodelEuler = new Vector3(0f, 180f, 0f);
+        public float viewmodelScale = 0.55f;
+
         [Header("Fire Settings")]
         public float fireRate = 4f; // shots per second
         public int pelletsPerShot = 1;

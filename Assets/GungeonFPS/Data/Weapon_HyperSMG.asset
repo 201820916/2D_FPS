@@ -15,6 +15,11 @@ MonoBehaviour:
   weaponName: HYPER PULSE SMG
   hudSprite: {fileID: 21300000, guid: 6161acf81542d7940a4642df0ac1e44a, type: 3}
   projectileColor: {r: 1, g: 0.3, b: 0.75, a: 1}
+  viewmodelPrefab: {fileID: 7180758019230602232, guid: 1b85614826c6f8640aa70864836ba6de, type: 3}
+  viewmodelAddress: Weapons/VM_HyperSMG
+  viewmodelOffset: {x: 0, y: 0, z: 0}
+  viewmodelEuler: {x: 0, y: 180, z: 0}
+  viewmodelScale: 0.55
   fireRate: 11.5
   pelletsPerShot: 1
   spreadAngle: 3.2

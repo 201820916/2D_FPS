@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 using UnityEngine.InputSystem;
+using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.UI;
 using GungeonFPS.Core;
 using GungeonFPS.Player;
@@ -43,6 +45,9 @@ namespace GungeonFPS.Weapons
         private float _bobTimer;
         private Vector2 _baseHudPos;
         private Vector3 _baseViewmodelPos;
+        private GameObject _activeViewmodelInstance;
+        private bool _activeViewmodelFromAddressables;
+        private int _viewmodelLoadVersion;
 
         private void Awake()
         {
@@ -251,18 +256,103 @@ namespace GungeonFPS.Weapons
             return previous;
         }
 
+        private void OnDestroy()
+        {
+            ReleaseActiveViewmodel();
+        }
+
+        private void ReleaseActiveViewmodel()
+        {
+            if (_activeViewmodelInstance == null) return;
+
+            if (_activeViewmodelFromAddressables)
+                Addressables.ReleaseInstance(_activeViewmodelInstance);
+            else
+                Destroy(_activeViewmodelInstance);
+
+            _activeViewmodelInstance = null;
+            _activeViewmodelFromAddressables = false;
+        }
+
         private void ApplyWeaponVisual()
         {
-            if (hudWeaponImage != null && CurrentWeapon != null && CurrentWeapon.hudSprite != null)
+            if (CurrentWeapon == null) return;
+
+            if (hudWeaponImage != null && CurrentWeapon.hudSprite != null)
             {
                 hudWeaponImage.sprite = CurrentWeapon.hudSprite;
                 hudWeaponImage.preserveAspect = true;
             }
-            if (gunCoreMaterial != null && CurrentWeapon != null)
+            if (gunCoreMaterial != null)
             {
                 gunCoreMaterial.color = CurrentWeapon.projectileColor;
                 gunCoreMaterial.SetColor("_EmissionColor", CurrentWeapon.projectileColor * 2.4f);
             }
+
+            if (viewmodelRoot == null) return;
+
+            _viewmodelLoadVersion++;
+            int requestVersion = _viewmodelLoadVersion;
+            ReleaseActiveViewmodel();
+
+            bool hasAddress = !string.IsNullOrEmpty(CurrentWeapon.viewmodelAddress);
+            if (!hasAddress && CurrentWeapon.viewmodelPrefab == null) return;
+
+            // Hide any static fallback meshes under viewmodelRoot (keep MuzzleLight active)
+            foreach (Transform child in viewmodelRoot)
+            {
+                if (muzzleLight != null && child == muzzleLight.transform) continue;
+                child.gameObject.SetActive(false);
+            }
+
+            WeaponData targetWeapon = CurrentWeapon;
+            if (hasAddress)
+            {
+                var handle = Addressables.InstantiateAsync(targetWeapon.viewmodelAddress, viewmodelRoot);
+                handle.Completed += op =>
+                {
+                    if (this == null || requestVersion != _viewmodelLoadVersion)
+                    {
+                        if (op.Status == AsyncOperationStatus.Succeeded && op.Result != null)
+                            Addressables.ReleaseInstance(op.Result);
+                        return;
+                    }
+
+                    if (op.Status == AsyncOperationStatus.Succeeded && op.Result != null)
+                    {
+                        ConfigureViewmodelInstance(op.Result, targetWeapon, true);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[WeaponController] Addressables load failed for '{targetWeapon.viewmodelAddress}'. Falling back to direct prefab.");
+                        SpawnFallbackPrefab(targetWeapon);
+                    }
+                };
+            }
+            else
+            {
+                SpawnFallbackPrefab(targetWeapon);
+            }
+        }
+
+        private void SpawnFallbackPrefab(WeaponData targetWeapon)
+        {
+            if (targetWeapon == null || targetWeapon.viewmodelPrefab == null || viewmodelRoot == null) return;
+            GameObject inst = Instantiate(targetWeapon.viewmodelPrefab, viewmodelRoot);
+            ConfigureViewmodelInstance(inst, targetWeapon, false);
+        }
+
+        private void ConfigureViewmodelInstance(GameObject instance, WeaponData weapon, bool fromAddressables)
+        {
+            _activeViewmodelInstance = instance;
+            _activeViewmodelFromAddressables = fromAddressables;
+
+            instance.transform.localPosition = weapon.viewmodelOffset;
+            instance.transform.localRotation = Quaternion.Euler(weapon.viewmodelEuler);
+            instance.transform.localScale = Vector3.one * weapon.viewmodelScale;
+
+            foreach (var col in instance.GetComponentsInChildren<Collider>())
+                Destroy(col);
         }
 
         private void UpdateHudWeaponAnimation()
