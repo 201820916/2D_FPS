@@ -20,6 +20,18 @@ namespace GungeonFPS.Core
     {
         public static RetroAudio Instance { get; private set; }
 
+        [Header("Optional External SFX Overrides (Empty = Procedural Fallback)")]
+        [SerializeField] private AudioClip pistolOverride;
+        [SerializeField] private AudioClip shotgunOverride;
+        [SerializeField] private AudioClip bounceOverride;
+        [SerializeField] private AudioClip hitOverride;
+        [SerializeField] private AudioClip dieOverride;
+        [SerializeField] private AudioClip dashOverride;
+        [SerializeField] private AudioClip blankOverride;
+        [SerializeField] private AudioClip hurtOverride;
+        [SerializeField] private AudioClip pickupOverride;
+        [SerializeField] private AudioClip doorOverride;
+
         private AudioSource _source;
         private AudioClip _pistolClip;
         private AudioClip _shotgunClip;
@@ -53,16 +65,16 @@ namespace GungeonFPS.Core
             if (_source == null) return;
             AudioClip clip = type switch
             {
-                SfxType.Pistol => _pistolClip,
-                SfxType.Shotgun => _shotgunClip,
-                SfxType.Bounce => _bounceClip,
-                SfxType.Hit => _hitClip,
-                SfxType.EnemyDie => _dieClip,
-                SfxType.Dash => _dashClip,
-                SfxType.Blank => _blankClip,
-                SfxType.Hurt => _hurtClip,
-                SfxType.Pickup => _pickupClip,
-                SfxType.DoorOpen => _doorClip,
+                SfxType.Pistol => pistolOverride != null ? pistolOverride : _pistolClip,
+                SfxType.Shotgun => shotgunOverride != null ? shotgunOverride : _shotgunClip,
+                SfxType.Bounce => bounceOverride != null ? bounceOverride : _bounceClip,
+                SfxType.Hit => hitOverride != null ? hitOverride : _hitClip,
+                SfxType.EnemyDie => dieOverride != null ? dieOverride : _dieClip,
+                SfxType.Dash => dashOverride != null ? dashOverride : _dashClip,
+                SfxType.Blank => blankOverride != null ? blankOverride : _blankClip,
+                SfxType.Hurt => hurtOverride != null ? hurtOverride : _hurtClip,
+                SfxType.Pickup => pickupOverride != null ? pickupOverride : _pickupClip,
+                SfxType.DoorOpen => doorOverride != null ? doorOverride : _doorClip,
                 _ => null
             };
             if (clip == null) return;

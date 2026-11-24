@@ -1446,6 +1446,21 @@ namespace GungeonFPS.Editor
             bbSo.FindProperty("lockYAxis").boolValue = false;
             bbSo.ApplyModifiedPropertiesWithoutUndo();
 
+            if (scriptType == typeof(PlayerProjectile))
+            {
+                var trail = go.AddComponent<TrailRenderer>();
+                trail.time = 0.09f;
+                trail.startWidth = 0.14f;
+                trail.endWidth = 0f;
+                trail.minVertexDistance = 0.05f;
+                trail.shadowCastingMode = ShadowCastingMode.Off;
+                trail.receiveShadows = false;
+                Shader trailShader = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit");
+                Material trailMat = new Material(trailShader);
+                AssetDatabase.CreateAsset(trailMat, ArtPath + "/PlayerBulletTrailMat.mat");
+                trail.sharedMaterial = trailMat;
+            }
+
             go.AddComponent(scriptType);
             string path = $"{PrefabPath}/{name}.prefab";
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, path);

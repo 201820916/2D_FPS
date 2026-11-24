@@ -1,5 +1,7 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using GungeonFPS.UI;
 
 namespace GungeonFPS.Core
 {
@@ -24,6 +26,7 @@ namespace GungeonFPS.Core
         private float _targetTilt;
         private Color _flashColor;
         private Vector3 _baseLocalPos;
+        private Coroutine _hitstopRoutine;
 
         private void Awake()
         {
@@ -94,6 +97,22 @@ namespace GungeonFPS.Core
             if (flashOverlay == null) return;
             _flashColor = new Color(color.r, color.g, color.b, alpha);
             flashOverlay.color = _flashColor;
+        }
+
+        public void TriggerHitstop(float duration = 0.035f)
+        {
+            if (InventoryUI.IsOpen || GameOverUI.IsOpen) return;
+            if (_hitstopRoutine != null) StopCoroutine(_hitstopRoutine);
+            _hitstopRoutine = StartCoroutine(HitstopCoroutine(duration));
+        }
+
+        private IEnumerator HitstopCoroutine(float duration)
+        {
+            Time.timeScale = 0.05f;
+            yield return new WaitForSecondsRealtime(duration);
+            if (!InventoryUI.IsOpen && !GameOverUI.IsOpen)
+                Time.timeScale = 1f;
+            _hitstopRoutine = null;
         }
     }
 }

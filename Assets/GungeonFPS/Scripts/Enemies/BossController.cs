@@ -29,6 +29,7 @@ namespace GungeonFPS.Enemies
         private float _spiralAngle;
         private float _flashTimer;
         private Color _baseColor = Color.white;
+        private Vector3 _baseVisualScale = Vector3.one;
         private Transform _player;
         private Vector3 _arenaCenter;
 
@@ -39,7 +40,10 @@ namespace GungeonFPS.Enemies
             if (spriteRenderer == null)
                 spriteRenderer = GetComponentInChildren<SpriteRenderer>();
             if (spriteRenderer != null)
+            {
                 _baseColor = spriteRenderer.color;
+                _baseVisualScale = spriteRenderer.transform.localScale;
+            }
         }
 
         private void OnEnable()
@@ -69,6 +73,12 @@ namespace GungeonFPS.Enemies
                 _flashTimer -= dt;
                 if (_flashTimer <= 0f && spriteRenderer != null)
                     spriteRenderer.color = IsPhaseTwo ? new Color(1f, 0.55f, 0.65f) : _baseColor;
+            }
+
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.transform.localScale = Vector3.Lerp(
+                    spriteRenderer.transform.localScale, _baseVisualScale, dt * 14f);
             }
 
             if (_player == null)
@@ -164,6 +174,7 @@ namespace GungeonFPS.Enemies
             if (spriteRenderer != null)
             {
                 spriteRenderer.color = Color.white;
+                spriteRenderer.transform.localScale = _baseVisualScale * 1.15f;
                 _flashTimer = 0.06f;
             }
 
@@ -175,6 +186,7 @@ namespace GungeonFPS.Enemies
                 RetroAudio.Instance?.Play(SfxType.Blank, 1.2f);
                 VfxSpawner.Instance?.SpawnBurst(transform.position + Vector3.up * 1.2f, new Color(1f, 0.2f, 0.65f), 32, 12f, 0.28f);
                 ScreenEffects.Instance?.AddShake(0.35f);
+                ScreenEffects.Instance?.TriggerHitstop(0.08f);
                 RunManager.RegisterKill();
                 OnDied?.Invoke(this);
                 Destroy(gameObject);

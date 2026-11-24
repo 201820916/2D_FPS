@@ -152,7 +152,10 @@ namespace GungeonFPS.Weapons
             }
 
             if (hitEnemy)
+            {
                 GameHUD.Instance?.TriggerHitmarker();
+                ScreenEffects.Instance?.TriggerHitstop(0.03f);
+            }
         }
 
         private void UpdateShield()

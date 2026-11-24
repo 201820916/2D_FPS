@@ -16,11 +16,31 @@ namespace GungeonFPS.Weapons
         private float _knockback;
         private int _bouncesRemaining;
         private float _timer;
+        private TrailRenderer _trail;
 
         private void Awake()
         {
             if (spriteRenderer == null)
                 spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+
+            _trail = GetComponent<TrailRenderer>();
+            if (_trail == null)
+            {
+                _trail = gameObject.AddComponent<TrailRenderer>();
+                _trail.time = 0.09f;
+                _trail.startWidth = 0.14f;
+                _trail.endWidth = 0f;
+                _trail.minVertexDistance = 0.05f;
+                _trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                _trail.receiveShadows = false;
+                Shader s = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit");
+                if (s != null) _trail.material = new Material(s);
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (_trail != null) _trail.Clear();
         }
 
         public void Initialize(Vector3 direction, float speed, float damage, float knockback, int bounces, float scale, Color color)
@@ -35,6 +55,15 @@ namespace GungeonFPS.Weapons
             transform.localScale = Vector3.one * scale;
             if (spriteRenderer != null)
                 spriteRenderer.color = color;
+
+            if (_trail != null)
+            {
+                _trail.Clear();
+                _trail.startWidth = Mathf.Clamp(scale * 0.42f, 0.08f, 0.22f);
+                _trail.endWidth = 0f;
+                _trail.startColor = color;
+                _trail.endColor = new Color(color.r, color.g, color.b, 0f);
+            }
         }
 
         private void Update()
