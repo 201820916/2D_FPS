@@ -78,29 +78,40 @@ namespace GungeonFPS.Dungeon
         public void GenerateDungeon()
         {
             _rooms.Clear();
-            var coords = BuildRandomGraph(Mathf.Max(4, totalRooms + RunManager.ExtraRooms));
+            int targetCount = Mathf.Max(4, totalRooms + RunManager.ExtraRooms);
+            List<Vector2Int> coords = BuildRandomGraph(targetCount);
+            Dictionary<Vector2Int, int> bfsDist = ComputeBfsDistances(coords);
 
-            // Determine Boss room (farthest Manhattan distance from 0,0)
+            // Pick Boss room: farthest BFS distance from Start (never adjacent to 0,0), preferring dead-ends
             Vector2Int bossPos = coords[coords.Count - 1];
-            int maxDist = -1;
+            int bestScore = int.MinValue;
             foreach (var c in coords)
             {
-                int d = Mathf.Abs(c.x) + Mathf.Abs(c.y);
-                if (d > maxDist && c != Vector2Int.zero)
+                if (c == Vector2Int.zero) continue;
+                int dist = bfsDist.TryGetValue(c, out int d) ? d : 0;
+                if (dist < 2) continue; // never adjacent to Start room
+
+                int neighbors = CountNeighbors(c, bfsDist);
+                int score = dist * 10 - (neighbors == 1 ? 0 : 3);
+                if (score > bestScore)
                 {
-                    maxDist = d;
+                    bestScore = score;
                     bossPos = c;
                 }
             }
 
-            // Pick 1 Treasure room (neither Start nor Boss)
+            // Pick 1 Treasure room (neither Start nor Boss, preferring dead-ends)
             Vector2Int treasurePos = Vector2Int.zero;
+            int bestTreasureScore = int.MinValue;
             foreach (var c in coords)
             {
-                if (c != Vector2Int.zero && c != bossPos)
+                if (c == Vector2Int.zero || c == bossPos) continue;
+                int neighbors = CountNeighbors(c, bfsDist);
+                int score = (neighbors == 1 ? 10 : 0) + (bfsDist.TryGetValue(c, out int d) ? d : 0);
+                if (score > bestTreasureScore)
                 {
+                    bestTreasureScore = score;
                     treasurePos = c;
-                    break;
                 }
             }
 
@@ -143,6 +154,27 @@ namespace GungeonFPS.Dungeon
             var list = new List<Vector2Int> { Vector2Int.zero };
             var set = new HashSet<Vector2Int> { Vector2Int.zero };
 
+            // Guarantee a minimum 3-room spine away from (0,0) so Boss room is never adjacent to Start
+            Vector2Int cur = Vector2Int.zero;
+            Vector2Int lastDir = Vector2Int.zero;
+            for (int step = 0; step < 3 && list.Count < count; step++)
+            {
+                var validDirs = new List<Vector2Int>();
+                foreach (var d in Dirs)
+                {
+                    if (d == -lastDir) continue;
+                    Vector2Int next = cur + d;
+                    if (!set.Contains(next) && (Mathf.Abs(next.x) + Mathf.Abs(next.y) > step))
+                        validDirs.Add(d);
+                }
+
+                if (validDirs.Count == 0) break;
+                lastDir = validDirs[UnityEngine.Random.Range(0, validDirs.Count)];
+                cur += lastDir;
+                list.Add(cur);
+                set.Add(cur);
+            }
+
             int safety = 0;
             while (list.Count < count && safety < 200)
             {
@@ -166,6 +198,38 @@ namespace GungeonFPS.Dungeon
             }
 
             return list;
+        }
+
+        private Dictionary<Vector2Int, int> ComputeBfsDistances(List<Vector2Int> coords)
+        {
+            var set = new HashSet<Vector2Int>(coords);
+            var dist = new Dictionary<Vector2Int, int> { [Vector2Int.zero] = 0 };
+            var q = new Queue<Vector2Int>();
+            q.Enqueue(Vector2Int.zero);
+
+            while (q.Count > 0)
+            {
+                var cur = q.Dequeue();
+                int nextDist = dist[cur] + 1;
+                foreach (var d in Dirs)
+                {
+                    var nb = cur + d;
+                    if (set.Contains(nb) && !dist.ContainsKey(nb))
+                    {
+                        dist[nb] = nextDist;
+                        q.Enqueue(nb);
+                    }
+                }
+            }
+            return dist;
+        }
+
+        private int CountNeighbors(Vector2Int cell, Dictionary<Vector2Int, int> allCells)
+        {
+            int count = 0;
+            foreach (var d in Dirs)
+                if (allCells.ContainsKey(cell + d)) count++;
+            return count;
         }
 
         private void BuildRoomGeometry(GeneratedRoomInfo info, ref int combatIdx)
